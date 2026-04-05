@@ -1,3 +1,8 @@
+---
+name: implementation-safety-check
+description: Check scope, adjacent regression risks, and validation coverage before and after implementation.
+---
+
 # implementation-safety-check
 
 ## Purpose

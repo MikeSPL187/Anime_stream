@@ -1,3 +1,8 @@
+---
+name: repo-discovery
+description: Inspect feature entry points, state flow, and data flow before non-trivial repository changes.
+---
+
 # repo-discovery
 
 ## Purpose

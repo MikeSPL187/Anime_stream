@@ -8,12 +8,11 @@ class AnilibriaEpisodeMapper {
   Episode mapEpisode({
     required AnilibriaEpisodeDto dto,
     required String seriesId,
-    required String seasonId,
+    String? seasonId,
   }) {
     return Episode(
       id: dto.id,
       seriesId: seriesId,
-      seasonId: seasonId,
       sortOrder: dto.ordinal,
       numberLabel: dto.ordinal.toString(),
       title: dto.title ?? 'Episode ${dto.ordinal}',
@@ -25,7 +24,7 @@ class AnilibriaEpisodeMapper {
       airDate: dto.airedAt,
       isFiller: dto.isFiller,
       isRecap: dto.isRecap,
-      availability: const AvailabilityState.available(),
+      availability: const AvailabilityState(),
     );
   }
 }

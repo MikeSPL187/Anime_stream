@@ -1,3 +1,8 @@
+---
+name: player-ux-pass
+description: Review player controls, overlays, and playback states to catch watch-flow UX issues.
+---
+
 # player-ux-pass
 
 ## Purpose

@@ -1,38 +1,29 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'availability_state.dart';
-import 'media_track.dart';
 
-class Episode {
-  const Episode({
-    required this.id,
-    required this.seriesId,
-    required this.seasonId,
-    required this.sortOrder,
-    required this.numberLabel,
-    required this.title,
-    required this.availability,
-    this.synopsis,
-    this.duration,
-    this.thumbnailImageUrl,
-    this.airDate,
-    this.isFiller = false,
-    this.isRecap = false,
-    this.audioTracks = const [],
-    this.subtitleTracks = const [],
-  });
+part 'episode.freezed.dart';
+part 'episode.g.dart';
 
-  final String id;
-  final String seriesId;
-  final String seasonId;
-  final int sortOrder;
-  final String numberLabel;
-  final String title;
-  final String? synopsis;
-  final Duration? duration;
-  final String? thumbnailImageUrl;
-  final DateTime? airDate;
-  final bool isFiller;
-  final bool isRecap;
-  final AvailabilityState availability;
-  final List<AudioTrack> audioTracks;
-  final List<SubtitleTrack> subtitleTracks;
+@freezed
+class Episode with _$Episode {
+  const factory Episode({
+    required String id,
+    required String seriesId,
+    required int sortOrder,
+    required String numberLabel,
+    required String title,
+    String? synopsis,
+    Duration? duration,
+    String? thumbnailImageUrl,
+    DateTime? airDate,
+    @Default(false) bool isFiller,
+    @Default(false) bool isRecap,
+    @Default(AvailabilityState()) AvailabilityState availability,
+    @Default(<String>[]) List<String> availableAudioLanguageCodes,
+    @Default(<String>[]) List<String> availableSubtitleLanguageCodes,
+  }) = _Episode;
+
+  factory Episode.fromJson(Map<String, dynamic> json) =>
+      _$EpisodeFromJson(json);
 }

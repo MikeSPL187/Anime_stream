@@ -1,15 +1,18 @@
-class PlaybackPreferences {
-  const PlaybackPreferences({
-    this.preferredAudioLanguageCodes = const [],
-    this.preferredSubtitleLanguageCodes = const [],
-    this.autoplayNextEpisode = true,
-    this.preferSubtitles = false,
-    this.defaultPlaybackSpeed = 1.0,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  final List<String> preferredAudioLanguageCodes;
-  final List<String> preferredSubtitleLanguageCodes;
-  final bool autoplayNextEpisode;
-  final bool preferSubtitles;
-  final double defaultPlaybackSpeed;
+part 'playback_preferences.freezed.dart';
+part 'playback_preferences.g.dart';
+
+@freezed
+class PlaybackPreferences with _$PlaybackPreferences {
+  const factory PlaybackPreferences({
+    @Default(<String>[]) List<String> preferredAudioLanguageCodes,
+    @Default(<String>[]) List<String> preferredSubtitleLanguageCodes,
+    @Default(true) bool autoplayNextEpisode,
+    @Default(false) bool preferSubtitles,
+    @Default(1.0) double defaultPlaybackSpeed,
+  }) = _PlaybackPreferences;
+
+  factory PlaybackPreferences.fromJson(Map<String, dynamic> json) =>
+      _$PlaybackPreferencesFromJson(json);
 }

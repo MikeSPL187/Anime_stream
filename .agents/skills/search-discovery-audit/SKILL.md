@@ -1,3 +1,8 @@
+---
+name: search-discovery-audit
+description: Evaluate search and discovery UX for findability, relevance, and failure recovery gaps.
+---
+
 # search-discovery-audit
 
 ## Purpose

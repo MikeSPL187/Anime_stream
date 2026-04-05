@@ -1,47 +1,28 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'availability_state.dart';
-import 'media_track.dart';
-import 'season.dart';
 
-enum SeriesLifecycleStatus {
-  ongoing,
-  completed,
-  upcoming,
-  hiatus,
-  unknown,
-}
+part 'series.freezed.dart';
+part 'series.g.dart';
 
-class Series {
-  const Series({
-    required this.id,
-    required this.slug,
-    required this.title,
-    required this.availability,
-    this.originalTitle,
-    this.synopsis,
-    this.posterImageUrl,
-    this.bannerImageUrl,
-    this.genres = const [],
-    this.releaseYear,
-    this.lifecycleStatus = SeriesLifecycleStatus.unknown,
-    this.seasons = const [],
-    this.availableAudioTracks = const [],
-    this.availableSubtitleTracks = const [],
-    this.lastUpdatedAt,
-  });
+enum SeriesStatus { ongoing, completed, upcoming, hiatus, unknown }
 
-  final String id;
-  final String slug;
-  final String title;
-  final String? originalTitle;
-  final String? synopsis;
-  final String? posterImageUrl;
-  final String? bannerImageUrl;
-  final List<String> genres;
-  final int? releaseYear;
-  final SeriesLifecycleStatus lifecycleStatus;
-  final List<Season> seasons;
-  final List<AudioTrack> availableAudioTracks;
-  final List<SubtitleTrack> availableSubtitleTracks;
-  final AvailabilityState availability;
-  final DateTime? lastUpdatedAt;
+@freezed
+class Series with _$Series {
+  const factory Series({
+    required String id,
+    required String slug,
+    required String title,
+    String? originalTitle,
+    String? synopsis,
+    String? posterImageUrl,
+    String? bannerImageUrl,
+    @Default(<String>[]) List<String> genres,
+    int? releaseYear,
+    @Default(SeriesStatus.unknown) SeriesStatus status,
+    @Default(AvailabilityState()) AvailabilityState availability,
+    DateTime? lastUpdatedAt,
+  }) = _Series;
+
+  factory Series.fromJson(Map<String, dynamic> json) => _$SeriesFromJson(json);
 }

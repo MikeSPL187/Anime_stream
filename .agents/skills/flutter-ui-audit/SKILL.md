@@ -1,3 +1,8 @@
+---
+name: flutter-ui-audit
+description: Audit Flutter screens for hierarchy, usability, responsiveness, and incomplete UI states before shipping.
+---
+
 # flutter-ui-audit
 
 ## Purpose

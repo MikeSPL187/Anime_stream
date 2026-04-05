@@ -1,3 +1,8 @@
+---
+name: series-detail-page-review
+description: Review the series detail page for CTA clarity, episode structure, and operational-hub usability.
+---
+
 # series-detail-page-review
 
 ## Purpose

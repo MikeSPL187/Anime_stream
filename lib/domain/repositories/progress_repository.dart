@@ -2,6 +2,9 @@ import '../models/continue_watching_entry.dart';
 import '../models/episode_progress.dart';
 import '../models/history_entry.dart';
 
+@Deprecated(
+  'Use WatchSystemRepository for stable watch-system progress contracts.',
+)
 abstract interface class ProgressRepository {
   Future<List<ContinueWatchingEntry>> getContinueWatching({int limit = 20});
 

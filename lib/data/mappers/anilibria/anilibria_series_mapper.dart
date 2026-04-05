@@ -16,7 +16,7 @@ class AnilibriaSeriesMapper {
       bannerImageUrl: dto.images?.bannerUrl,
       genres: dto.genres,
       releaseYear: dto.releaseYear,
-      availability: const AvailabilityState.available(),
+      availability: const AvailabilityState(),
       lastUpdatedAt: dto.updatedAt,
     );
   }
