@@ -1,0 +1,14 @@
+[profiles.review]
+approval_policy = "untrusted"
+sandbox_mode = "read-only"
+reasoning_effort = "high"
+
+[profiles.development]
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+reasoning_effort = "medium"
+
+[profiles.trusted]
+approval_policy = "on-failure"
+sandbox_mode = "workspace-write"
+reasoning_effort = "low"
