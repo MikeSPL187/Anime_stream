@@ -1,0 +1,2081 @@
+Repository: anime_stream_app
+Branch: main
+Latest commit: f987240323264b02cd19fc771446dc753fee92b6
+
+Project tree:
+.
+  .agents
+  .codex
+  .flutter-plugins-dependencies
+  .gitignore
+  .metadata
+  AGENTS.md
+  CODING_RULES.md
+  PROJECT_SPEC.md
+  README.md
+  analysis_options.yaml
+  android
+  anime_stream_app.iml
+  ios
+  lib
+  linux
+  macos
+  pubspec.lock
+  pubspec.yaml
+  test
+  web
+  windows
+  lib/app
+  lib/app/app.dart
+  lib/app/di
+  lib/app/di/series_repository_provider.dart
+  lib/app/router
+  lib/app/router/app_router.dart
+  lib/app/series
+  lib/app/series/series_details_data.dart
+  lib/app/series/series_providers.dart
+  lib/app/theme
+  lib/data
+  lib/data/adapters
+  lib/data/adapters/anilibria
+  lib/data/dto
+  lib/data/dto/anilibria
+  lib/data/local
+  lib/data/mappers
+  lib/data/mappers/anilibria
+  lib/data/repositories
+  lib/data/repositories/anilibria
+  lib/domain
+  lib/domain/models
+  lib/domain/models/availability_state.dart
+  lib/domain/models/continue_watching_entry.dart
+  lib/domain/models/custom_list.dart
+  lib/domain/models/download_entry.dart
+  lib/domain/models/episode.dart
+  lib/domain/models/episode_progress.dart
+  lib/domain/models/history_entry.dart
+  lib/domain/models/media_track.dart
+  lib/domain/models/playback_preferences.dart
+  lib/domain/models/season.dart
+  lib/domain/models/series.dart
+  lib/domain/models/watchlist_entry.dart
+  lib/domain/repositories
+  lib/domain/repositories/catalog_discovery_repository.dart
+  lib/domain/repositories/downloads_repository.dart
+  lib/domain/repositories/playback_preferences_repository.dart
+  lib/domain/repositories/playback_repository.dart
+  lib/domain/repositories/progress_repository.dart
+  lib/domain/repositories/search_repository.dart
+  lib/domain/repositories/series_details_repository.dart
+  lib/domain/repositories/series_repository.dart
+  lib/domain/repositories/simulcasts_updates_repository.dart
+  lib/domain/repositories/watch_system_repository.dart
+  lib/domain/repositories/watchlist_lists_repository.dart
+  lib/domain/usecases
+  lib/features
+  lib/features/account
+  lib/features/browse
+  lib/features/home
+  lib/features/home/home_screen.dart
+  lib/features/my_lists
+  lib/features/player
+  lib/features/player/player_screen.dart
+  lib/features/search
+  lib/features/search/search_screen.dart
+  lib/features/series
+  lib/features/series/series_screen.dart
+  lib/features/simulcasts
+  lib/main.dart
+  lib/shared
+  lib/shared/state
+  lib/shared/utils
+  lib/shared/widgets
+  test/data
+  test/data/repositories
+  test/data/repositories/anilibria
+  test/data/repositories/anilibria/anilibria_series_repository_test.dart
+
+===== FILE: pubspec.yaml =====
+name: anime_stream_app
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  go_router: ^14.6.2
+  dio: ^5.7.0
+  sqflite: ^2.4.1
+  path_provider: ^2.1.5
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_video: ^1.0.5
+  cached_network_image: ^3.4.1
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
+
+flutter:
+  uses-material-design: true
+
+===== FILE: AGENTS.md =====
+# AGENTS.md
+
+## Project Operating Contract
+
+### Mission
+Develop `anime_stream_app` through small, controlled, verifiable changes that preserve architectural clarity and keep the repository safe to evolve.
+
+### Core Working Rules
+- Start by understanding the current implementation before making changes.
+- Follow the workflow `discovery -> plan -> implement -> verify`.
+- Make minimal, targeted changes that solve the requested task.
+- Reuse existing structure when it is good enough.
+- Do not perform random architectural reshaping, broad cleanup, or speculative abstraction work.
+- If behavior is unknown, implement the safest minimum and label it as proposed behavior.
+
+### Repository Structure
+This structure is partly present today and partly inferred from the current folder layout:
+- `lib/features`: presentation-facing feature areas and screens.
+- `lib/domain`: product-facing models, repository contracts, and use cases.
+- `lib/data`: provider adapters, DTOs, mappers, and repository implementations.
+- `lib/shared`: reusable app-wide widgets, state helpers, and utilities.
+- `lib/app`: app shell concerns such as routing, DI, and theme.
+
+Treat this as the current intended layering unless the repository later defines something more specific.
+
+### Current Product Assumptions
+These are current project/domain assumptions, not general operating rules:
+- Build a Flutter anime streaming product with AniLibria as a provider adapter.
+- UI and domain should not depend directly on AniLibria DTOs or response models.
+- Series Page is intended to be an operational hub.
+- Player is intended to be a dedicated watch-system surface.
+- Continue Watching, History, Watchlist, Downloads, and EpisodeProgress are first-class systems.
+- Language, audio, and subtitle modeling should stay separate from season structure.
+- Do not use dub-as-season.
+
+### Expected Workflow
+1. Discovery
+   Read the relevant files first. Identify entry points, state holders, repositories, adapters, and affected screens before touching code.
+2. Plan
+   Define the smallest safe change set that solves the task. Keep the plan narrow and explicit about touched files and validation.
+3. Implement
+   Change only the files required for the task. Prefer focused edits over refactors.
+4. Verify
+   Validate with the best available project commands and report the results.
+
+### When To Use `/plan`
+Use `/plan` when:
+- the request is ambiguous or spans multiple layers
+- the work crosses domain, data, and UI boundaries
+- the task may affect player flows, watch systems, navigation, or state architecture
+- the change requires sequencing, migration, or tradeoff discussion
+- you need to surface blockers before implementation
+
+Do not default to `/plan` for small, local, mechanical edits.
+
+### When To Use `/review`
+Use `/review` when:
+- reviewing a bugfix for regressions or missed edge cases
+- reviewing risky UI changes, player behavior, search/discovery logic, or state transitions
+- checking a refactor before merge
+- validating whether a change stayed within scope
+
+`/review` should focus on bugs, regressions, missing validation, and behavioral risk before style concerns.
+
+### UI Task Rules
+- Understand the existing screen structure, routing, and state inputs before editing widgets.
+- Keep UI aligned with product behavior, not provider response shape.
+- Do not invent parity facts. If behavior is inferred, mark it as proposed behavior.
+- Respect visual hierarchy, spacing, safe areas, responsiveness, loading states, empty states, and error states.
+- For streaming surfaces, verify CTA clarity, episode affordances, watch-state visibility, and navigation continuity.
+- Avoid cosmetic rewrites unless the task explicitly asks for them.
+
+### Bugfix Task Rules
+- Reproduce the bug from code paths and state flow before changing logic.
+- Find the narrowest fix that addresses the root cause.
+- Check nearby flows that could regress, especially watch progress, player state, search results, lists, and navigation.
+- Do not quietly mix unrelated cleanup into the fix.
+- State the likely cause, the exact fix, and the verification steps used.
+
+### Refactoring Rules
+- Refactor only when it directly supports the requested task or removes a concrete blocker.
+- Preserve behavior unless the task explicitly changes behavior.
+- Avoid wide file moves, renames, or architectural reshaping without necessity.
+- Keep interfaces product-oriented and provider-agnostic.
+- If a larger redesign is warranted but not requested, leave a concise note instead of expanding scope.
+
+### Change Reporting
+After changes:
+- list the exact changed files
+- describe behavior changes
+- call out any proposed behavior
+- state the validation run, including commands and outcomes
+- mention residual risks, TODOs, or blockers
+
+### Default Validation Commands
+Unless the repository defines more specific project commands, use these as default validation commands where relevant:
+- `flutter analyze`
+- `flutter test`
+- `dart format .`
+
+## Safety Boundaries
+- Do not change code blindly. Read the current implementation first.
+- Do not perform broad architectural rewrites without explicit need.
+- Do not add dependencies or modify `pubspec.yaml` unless the task truly requires it.
+- Do not leak AniLibria DTOs into domain or UI.
+- Do not use dub-as-season, even as a temporary shortcut.
+- Do not change unrelated files just because they are nearby.
+- Do not fake verification. If something was not run, say so.
+- Do not treat unknown product behavior as confirmed parity.
+
+## Definition of Done
+- The requested change is implemented and stays within scope.
+- Existing architecture boundaries remain intact.
+- Only necessary files were touched.
+- The final report includes exact changed files, behavior changes, proposed behavior, validation run, and residual risks.
+- The changed behavior is explained clearly.
+- Validation was run with available project commands, and the outcome is reported.
+- Residual risks, TODOs, and proposed behavior are explicitly called out.
+
+===== FILE: PROJECT_SPEC.md =====
+# PROJECT_SPEC.md
+
+## Project
+New Flutter anime streaming app with Crunchyroll-like watch architecture.
+
+## Product Goal
+Build a premium-feeling anime streaming app inspired by Crunchyroll’s strongest product patterns:
+- Series Page as operational hub
+- state-driven primary CTA
+- watched-state correction
+- player settings hub
+- sticky per-series audio
+- Continue Watching / History / Watchlist / Downloads
+- portrait watch page + landscape fullscreen
+
+## Non-Goals
+- not a literal 1:1 Crunchyroll clone
+- no direct copying of branding, text, icons, or assets
+- no dub-as-season architecture
+- no direct UI coupling to AniLibria DTOs
+
+## Data Source
+AniLibria API via adapter layer.
+AniLibria is a provider, not the app’s internal product model.
+
+## Architecture Rules
+1. Domain layer must not depend on AniLibria DTOs.
+2. UI must consume domain models only.
+3. Language/audio/subtitle model must be separate from seasons.
+4. Continue Watching, History, Watchlist, Downloads, EpisodeProgress are first-class systems.
+5. Player must receive explicit session context.
+6. Unknown parity behavior must be implemented reasonably and marked as proposed behavior.
+
+## Core Domain Entities
+- Series
+- Season
+- Episode
+- EpisodeProgress
+- ContinueWatchingEntry
+- HistoryEntry
+- WatchlistEntry
+- CustomList
+- DownloadEntry
+- PlaybackPreferences
+- AvailabilityState
+
+## Priority Build Order
+1. Domain models + repository interfaces
+2. AniLibria adapter layer
+3. App shell + routing
+4. Series Page
+5. Player foundation
+6. Watch systems
+7. Browse / Search / Simulcasts
+8. My Lists + Account
+9. Polish
+
+## UX Principles
+- Series Page is not an info screen; it is a control surface.
+- State-driven CTA must reflect watch state.
+- Player settings hub must include:
+  - Autoplay
+  - Audio
+  - Subtitles/CC
+  - Quality
+  - Playback Speed
+  - Report a Problem
+- Language is a first-class discovery axis.
+- Sticky per-series audio must exist.
+- Manual watched correction must exist at episode/season/series levels.
+
+## Known Strategic Improvements vs Crunchyroll
+- proper variant model instead of dub-as-season
+- cleaner back-stack architecture
+- optional Android PiP later
+- stronger Search/Browse later
+
+## Prompting Rules for Codex
+- make small safe changes
+- avoid speculative wide refactors
+- explain what changed
+- list touched files
+- separate confirmed parity from proposed behavior
+
+===== FILE: CODING_RULES.md =====
+# CODING_RULES.md
+
+## Role
+Act as tech lead and implementation engineer for a new anime streaming app.
+
+## Primary Goal
+Build a Crunchyroll-like anime streaming app with clean internal architecture and AniLibria as provider adapter.
+
+## Non-Negotiable Rules
+1. Do not couple UI or domain to AniLibria DTOs.
+2. Do not implement dub-as-season.
+3. Keep language/audio/subtitle model separate from season structure.
+4. Treat Continue Watching, History, Watchlist, Downloads, EpisodeProgress as first-class systems.
+5. Series Page must be an operational hub, not a static info page.
+6. Player must be a dedicated watch-system surface.
+7. Separate parity-driven behavior from proposed behavior.
+8. Prefer small safe changes over broad refactors.
+9. Do not add dependencies unless necessary.
+10. Do not change pubspec.yaml unless required for the requested task.
+
+## Engineering Style
+- Read the current codebase before making changes.
+- Reuse existing structure when reasonable.
+- Avoid speculative abstractions.
+- Avoid mass renames and wide cleanup unless explicitly requested.
+- Leave TODOs where provider/API details are not yet finalized.
+- Prefer compile-safe scaffolding over premature completeness.
+
+## Output Style
+After each task, report:
+1. Created
+2. Updated
+3. Architectural decisions
+4. Risks / TODO
+5. Next recommended step
+
+===== FILE: lib/main.dart =====
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'app/app.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Reserved for future startup initialization such as storage or player setup.
+  runApp(const ProviderScope(child: AnimeStreamApp()));
+}
+
+===== FILE: lib/app/app.dart =====
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'router/app_router.dart';
+
+class AnimeStreamApp extends ConsumerWidget {
+  const AnimeStreamApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
+
+    return MaterialApp.router(
+      title: 'Anime Stream',
+      debugShowCheckedModeBanner: false,
+      routerConfig: router,
+    );
+  }
+}
+
+===== FILE: lib/app/router/app_router.dart =====
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/home/home_screen.dart';
+import '../../features/player/player_screen.dart';
+import '../../features/search/search_screen.dart';
+import '../../features/series/series_screen.dart';
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: AppRoutePaths.home,
+    routes: [
+      GoRoute(
+        path: AppRoutePaths.home,
+        builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePaths.search,
+        builder: (context, state) => const SearchScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePaths.series,
+        builder: (context, state) {
+          final seriesId = state.pathParameters['id']!;
+          return SeriesScreen(seriesId: seriesId);
+        },
+      ),
+      GoRoute(
+        path: AppRoutePaths.player,
+        builder: (context, state) {
+          final sessionContext = state.extra is PlayerScreenContext
+              ? state.extra as PlayerScreenContext
+              : null;
+
+          return PlayerScreen(sessionContext: sessionContext);
+        },
+      ),
+    ],
+  );
+});
+
+abstract final class AppRoutePaths {
+  static const home = '/';
+  static const search = '/search';
+  static const series = '/series/:id';
+  static const player = '/player';
+
+  static String seriesDetails(String id) => '/series/$id';
+}
+
+===== FILE: lib/app/di/series_repository_provider.dart =====
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/adapters/anilibria/anilibria_remote_data_source.dart';
+import '../../data/adapters/anilibria/dio_anilibria_remote_data_source.dart';
+import '../../data/mappers/anilibria/anilibria_episode_mapper.dart';
+import '../../data/mappers/anilibria/anilibria_series_mapper.dart';
+import '../../data/repositories/anilibria/anilibria_series_repository.dart';
+import '../../domain/repositories/series_repository.dart';
+
+final anilibriaDioProvider = Provider<Dio>((ref) {
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: DioAnilibriaRemoteDataSource.apiBaseUrl,
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
+
+  ref.onDispose(dio.close);
+  return dio;
+});
+
+final anilibriaRemoteDataSourceProvider = Provider<AnilibriaRemoteDataSource>((
+  ref,
+) {
+  return DioAnilibriaRemoteDataSource(dio: ref.watch(anilibriaDioProvider));
+});
+
+final anilibriaSeriesMapperProvider = Provider<AnilibriaSeriesMapper>((ref) {
+  return const AnilibriaSeriesMapper();
+});
+
+final anilibriaEpisodeMapperProvider = Provider<AnilibriaEpisodeMapper>((ref) {
+  return const AnilibriaEpisodeMapper();
+});
+
+final seriesRepositoryProvider = Provider<SeriesRepository>((ref) {
+  return AniLibriaSeriesRepository(
+    remoteDataSource: ref.watch(anilibriaRemoteDataSourceProvider),
+    seriesMapper: ref.watch(anilibriaSeriesMapperProvider),
+    episodeMapper: ref.watch(anilibriaEpisodeMapperProvider),
+  );
+});
+
+===== FILE: lib/app/series/series_details_data.dart =====
+import 'package:flutter/foundation.dart';
+
+import '../../domain/models/episode.dart';
+import '../../domain/models/series.dart';
+
+@immutable
+class SeriesDetailsData {
+  SeriesDetailsData({required this.series, required List<Episode> episodes})
+    : episodes = List.unmodifiable(episodes);
+
+  final Series series;
+  final List<Episode> episodes;
+}
+
+===== FILE: lib/app/series/series_providers.dart =====
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../domain/models/series.dart';
+import '../di/series_repository_provider.dart';
+import 'series_details_data.dart';
+
+final featuredSeriesProvider = FutureProvider.autoDispose<List<Series>>((
+  ref,
+) async {
+  final repository = ref.watch(seriesRepositoryProvider);
+  return repository.getFeaturedSeries();
+});
+
+final seriesDetailsProvider = FutureProvider.autoDispose
+    .family<SeriesDetailsData, String>((ref, seriesId) async {
+      final repository = ref.watch(seriesRepositoryProvider);
+      final seriesFuture = repository.getSeriesById(seriesId);
+      final episodesFuture = repository.getEpisodes(seriesId);
+
+      return SeriesDetailsData(
+        series: await seriesFuture,
+        episodes: await episodesFuture,
+      );
+    });
+
+===== FILE: lib/domain/models/availability_state.dart =====
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'availability_state.freezed.dart';
+part 'availability_state.g.dart';
+
+enum AvailabilityStatus {
+  available,
+  scheduled,
+  unavailable,
+  regionRestricted,
+  subscriptionRequired,
+}
+
+@freezed
+class AvailabilityState with _$AvailabilityState {
+  const factory AvailabilityState({
+    @Default(AvailabilityStatus.available) AvailabilityStatus status,
+    DateTime? availableFrom,
+    DateTime? expiresAt,
+    String? reason,
+  }) = _AvailabilityState;
+
+  factory AvailabilityState.fromJson(Map<String, dynamic> json) =>
+      _$AvailabilityStateFromJson(json);
+}
+
+===== FILE: lib/domain/models/series.dart =====
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'availability_state.dart';
+
+part 'series.freezed.dart';
+part 'series.g.dart';
+
+enum SeriesStatus { ongoing, completed, upcoming, hiatus, unknown }
+
+@freezed
+class Series with _$Series {
+  const factory Series({
+    required String id,
+    required String slug,
+    required String title,
+    String? originalTitle,
+    String? synopsis,
+    String? posterImageUrl,
+    String? bannerImageUrl,
+    @Default(<String>[]) List<String> genres,
+    int? releaseYear,
+    @Default(SeriesStatus.unknown) SeriesStatus status,
+    @Default(AvailabilityState()) AvailabilityState availability,
+    DateTime? lastUpdatedAt,
+  }) = _Series;
+
+  factory Series.fromJson(Map<String, dynamic> json) => _$SeriesFromJson(json);
+}
+
+===== FILE: lib/domain/models/episode.dart =====
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'availability_state.dart';
+
+part 'episode.freezed.dart';
+part 'episode.g.dart';
+
+@freezed
+class Episode with _$Episode {
+  const factory Episode({
+    required String id,
+    required String seriesId,
+    required int sortOrder,
+    required String numberLabel,
+    required String title,
+    String? synopsis,
+    Duration? duration,
+    String? thumbnailImageUrl,
+    DateTime? airDate,
+    @Default(false) bool isFiller,
+    @Default(false) bool isRecap,
+    @Default(AvailabilityState()) AvailabilityState availability,
+    @Default(<String>[]) List<String> availableAudioLanguageCodes,
+    @Default(<String>[]) List<String> availableSubtitleLanguageCodes,
+  }) = _Episode;
+
+  factory Episode.fromJson(Map<String, dynamic> json) =>
+      _$EpisodeFromJson(json);
+}
+
+===== FILE: lib/domain/models/episode_progress.dart =====
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'episode_progress.freezed.dart';
+part 'episode_progress.g.dart';
+
+@freezed
+class EpisodeProgress with _$EpisodeProgress {
+  const factory EpisodeProgress({
+    required String seriesId,
+    required String episodeId,
+    required Duration position,
+    Duration? totalDuration,
+    @Default(false) bool isCompleted,
+    required DateTime updatedAt,
+  }) = _EpisodeProgress;
+
+  factory EpisodeProgress.fromJson(Map<String, dynamic> json) =>
+      _$EpisodeProgressFromJson(json);
+}
+
+===== FILE: lib/domain/models/continue_watching_entry.dart =====
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'episode.dart';
+import 'episode_progress.dart';
+import 'series.dart';
+
+part 'continue_watching_entry.freezed.dart';
+part 'continue_watching_entry.g.dart';
+
+@freezed
+class ContinueWatchingEntry with _$ContinueWatchingEntry {
+  const factory ContinueWatchingEntry({
+    required Series series,
+    required Episode episode,
+    required EpisodeProgress progress,
+    required DateTime lastEngagedAt,
+  }) = _ContinueWatchingEntry;
+
+  factory ContinueWatchingEntry.fromJson(Map<String, dynamic> json) =>
+      _$ContinueWatchingEntryFromJson(json);
+}
+
+===== FILE: lib/domain/models/playback_preferences.dart =====
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'playback_preferences.freezed.dart';
+part 'playback_preferences.g.dart';
+
+@freezed
+class PlaybackPreferences with _$PlaybackPreferences {
+  const factory PlaybackPreferences({
+    @Default(<String>[]) List<String> preferredAudioLanguageCodes,
+    @Default(<String>[]) List<String> preferredSubtitleLanguageCodes,
+    @Default(true) bool autoplayNextEpisode,
+    @Default(false) bool preferSubtitles,
+    @Default(1.0) double defaultPlaybackSpeed,
+  }) = _PlaybackPreferences;
+
+  factory PlaybackPreferences.fromJson(Map<String, dynamic> json) =>
+      _$PlaybackPreferencesFromJson(json);
+}
+
+===== FILE: lib/domain/repositories/series_repository.dart =====
+import '../models/episode.dart';
+import '../models/series.dart';
+
+abstract interface class SeriesRepository {
+  Future<List<Series>> getFeaturedSeries({int limit = 20});
+
+  Future<List<Series>> getTrendingSeries({int limit = 20});
+
+  Future<List<Series>> getPopularSeries({int limit = 20});
+
+  Future<List<Series>> searchSeries(String query, {int limit = 20});
+
+  Future<Series> getSeriesById(String seriesId);
+
+  Future<List<Episode>> getEpisodes(String seriesId);
+}
+
+===== FILE: lib/domain/repositories/watch_system_repository.dart =====
+import '../models/continue_watching_entry.dart';
+import '../models/episode_progress.dart';
+
+abstract interface class WatchSystemRepository {
+  Future<List<ContinueWatchingEntry>> getContinueWatching({int limit = 20});
+
+  Future<EpisodeProgress?> getEpisodeProgress({
+    required String seriesId,
+    required String episodeId,
+  });
+
+  Future<void> saveEpisodeProgress(EpisodeProgress progress);
+}
+
+===== FILE: lib/domain/repositories/playback_repository.dart =====
+import '../models/playback_preferences.dart';
+
+abstract interface class PlaybackRepository {
+  Future<PlaybackPreferences> getPlaybackPreferences();
+
+  Future<void> savePlaybackPreferences(PlaybackPreferences preferences);
+}
+
+===== FILE: lib/data/adapters/anilibria/dio_anilibria_remote_data_source.dart =====
+import 'package:dio/dio.dart';
+
+import '../../dto/anilibria/anilibria_episode_dto.dart';
+import '../../dto/anilibria/anilibria_release_dto.dart';
+import 'anilibria_remote_data_source.dart';
+
+class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
+  DioAnilibriaRemoteDataSource({required Dio dio}) : _dio = dio;
+
+  static const apiBaseUrl = 'https://api.anilibria.tv/v3/';
+  static const _seriesFilter =
+      'id,code,names,description,genres,posters,updated,season,status';
+  static const _episodesFilter = 'id,player.list';
+
+  final Dio _dio;
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchFeaturedReleases({
+    int limit = 20,
+  }) async {
+    final payload = await _getJson(
+      'title/updates',
+      queryParameters: {..._defaultQueryParameters(limit: limit)},
+    );
+
+    return _parseReleaseList(payload);
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({
+    int limit = 20,
+  }) async {
+    final payload = await _getJson(
+      'title/changes',
+      queryParameters: {..._defaultQueryParameters(limit: limit)},
+    );
+
+    return _parseReleaseList(payload);
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchPopularReleases({
+    int limit = 20,
+  }) async {
+    final payload = await _getJson(
+      'title/search/advanced',
+      queryParameters: {
+        ..._defaultQueryParameters(limit: limit),
+        'simple_query': 'status.code==1',
+        'order_by': 'in_favorites',
+        'sort_direction': 1,
+      },
+    );
+
+    return _parseReleaseList(payload);
+  }
+
+  @override
+  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) async {
+    final payload = await _getJson(
+      'title',
+      queryParameters: {
+        'id': releaseId,
+        'filter': '$_seriesFilter,player.list',
+        'playlist_type': 'array',
+      },
+    );
+
+    return _parseRelease(_extractObject(payload));
+  }
+
+  @override
+  Future<List<AnilibriaEpisodeDto>> fetchReleaseEpisodes(
+    String releaseId,
+  ) async {
+    final payload = await _getJson(
+      'title',
+      queryParameters: {
+        'id': releaseId,
+        'filter': _episodesFilter,
+        'playlist_type': 'array',
+      },
+    );
+
+    return _parseRelease(_extractObject(payload)).episodes;
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> searchReleases(
+    String query, {
+    int limit = 20,
+  }) async {
+    final payload = await _getJson(
+      'title/search',
+      queryParameters: {
+        ..._defaultQueryParameters(limit: limit),
+        'search': query,
+      },
+    );
+
+    return _parseReleaseList(payload);
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchSimulcastReleases({
+    int limit = 20,
+  }) async {
+    final payload = await _getJson(
+      'title/search/advanced',
+      queryParameters: {
+        ..._defaultQueryParameters(limit: limit),
+        'simple_query': 'status.code==1',
+        'order_by': 'updated',
+        'sort_direction': 1,
+      },
+    );
+
+    return _parseReleaseList(payload);
+  }
+
+  Future<dynamic> _getJson(
+    String path, {
+    Map<String, Object?>? queryParameters,
+  }) async {
+    final response = await _dio.get<dynamic>(
+      path,
+      queryParameters: queryParameters,
+      options: Options(responseType: ResponseType.json),
+    );
+
+    return response.data;
+  }
+
+  Map<String, Object?> _defaultQueryParameters({required int limit}) {
+    return {'filter': _seriesFilter, 'limit': limit};
+  }
+
+  List<AnilibriaReleaseDto> _parseReleaseList(dynamic payload) {
+    final rawList = _extractList(payload);
+    return rawList.map(_parseRelease).toList(growable: false);
+  }
+
+  AnilibriaReleaseDto _parseRelease(Map<String, dynamic> json) {
+    final releaseId = _readString(json['id']);
+    final namesJson = _readMap(json['names']);
+    final seasonJson = _readMap(json['season']);
+    final statusJson = _readMap(json['status']);
+
+    if (releaseId == null || releaseId.isEmpty) {
+      throw const FormatException('AniLibria release is missing an id.');
+    }
+
+    return AnilibriaReleaseDto(
+      id: releaseId,
+      code: _readString(json['code']),
+      names: AnilibriaNamesDto(
+        main: _readString(namesJson?['ru']) ?? _readString(namesJson?['main']),
+        english:
+            _readString(namesJson?['en']) ?? _readString(namesJson?['english']),
+        alternative: _readStringList(namesJson?['alternative']),
+      ),
+      description: _readString(json['description']),
+      genres: _readStringList(json['genres']),
+      images: AnilibriaImageSetDto(
+        posterUrl: _extractPosterUrl(json),
+        bannerUrl: _extractBannerUrl(json),
+      ),
+      releaseYear:
+          _readInt(json['releaseYear']) ??
+          _readInt(json['release_year']) ??
+          _readInt(seasonJson?['year']),
+      updatedAt:
+          _readDateTime(json['updatedAt']) ??
+          _readDateTime(json['updated']) ??
+          _readDateTime(json['last_change']),
+      episodes: _parseEpisodes(json, releaseId: releaseId),
+      raw: {
+        ...Map<String, Object?>.from(json),
+        ...?statusJson == null ? null : {'status': statusJson},
+      },
+    );
+  }
+
+  List<AnilibriaEpisodeDto> _parseEpisodes(
+    Map<String, dynamic> releaseJson, {
+    required String releaseId,
+  }) {
+    final episodesJson = releaseJson['episodes'];
+    if (episodesJson is List) {
+      return episodesJson
+          .map((entry) => _parseEpisode(entry, releaseId: releaseId))
+          .whereType<AnilibriaEpisodeDto>()
+          .toList(growable: false);
+    }
+
+    final playerJson = _readMap(releaseJson['player']);
+    final playerList = playerJson?['list'];
+
+    if (playerList is List) {
+      return playerList
+          .map((entry) => _parseEpisode(entry, releaseId: releaseId))
+          .whereType<AnilibriaEpisodeDto>()
+          .toList(growable: false);
+    }
+
+    if (playerList is Map) {
+      return playerList.entries
+          .map(
+            (entry) => _parseEpisode(
+              entry.value,
+              releaseId: releaseId,
+              fallbackOrdinal: _readInt(entry.key),
+            ),
+          )
+          .whereType<AnilibriaEpisodeDto>()
+          .toList(growable: false);
+    }
+
+    return const [];
+  }
+
+  AnilibriaEpisodeDto? _parseEpisode(
+    dynamic payload, {
+    required String releaseId,
+    int? fallbackOrdinal,
+  }) {
+    final json = _readMap(payload);
+    if (json == null) {
+      return null;
+    }
+
+    final ordinal =
+        _readInt(json['episode']) ??
+        _readInt(json['ordinal']) ??
+        fallbackOrdinal;
+    if (ordinal == null) {
+      return null;
+    }
+
+    return AnilibriaEpisodeDto(
+      id:
+          _readString(json['uuid']) ??
+          _readString(json['id']) ??
+          '$releaseId-$ordinal',
+      releaseId: _readString(json['releaseId']) ?? releaseId,
+      ordinal: ordinal,
+      title: _readString(json['name']) ?? _readString(json['title']),
+      description: _readString(json['description']),
+      durationSeconds:
+          _readInt(json['duration']) ?? _readInt(json['duration_seconds']),
+      thumbnailUrl:
+          _readString(json['preview']) ?? _readString(json['thumbnail']),
+      airedAt:
+          _readDateTime(json['airedAt']) ??
+          _readDateTime(json['aired_at']) ??
+          _readDateTime(json['created_timestamp']),
+      isFiller:
+          _readBool(json['is_filler']) ?? _readBool(json['isFiller']) ?? false,
+      isRecap:
+          _readBool(json['is_recap']) ?? _readBool(json['isRecap']) ?? false,
+      raw: Map<String, Object?>.from(json),
+    );
+  }
+
+  String? _extractPosterUrl(Map<String, dynamic> json) {
+    final imagesJson = _readMap(json['images']);
+    if (imagesJson != null) {
+      return _readString(imagesJson['posterUrl']) ??
+          _readString(imagesJson['poster_url']);
+    }
+
+    final postersJson = _readMap(json['posters']);
+    if (postersJson == null) {
+      return null;
+    }
+
+    return _readString(_readMap(postersJson['medium'])?['url']) ??
+        _readString(_readMap(postersJson['small'])?['url']) ??
+        _readString(_readMap(postersJson['original'])?['url']);
+  }
+
+  String? _extractBannerUrl(Map<String, dynamic> json) {
+    final imagesJson = _readMap(json['images']);
+    if (imagesJson == null) {
+      return null;
+    }
+
+    return _readString(imagesJson['bannerUrl']) ??
+        _readString(imagesJson['banner_url']);
+  }
+
+  Map<String, dynamic> _extractObject(dynamic payload) {
+    if (payload is Map) {
+      return Map<String, dynamic>.from(payload);
+    }
+
+    throw FormatException(
+      'Expected AniLibria object payload, got ${payload.runtimeType}.',
+    );
+  }
+
+  List<Map<String, dynamic>> _extractList(dynamic payload) {
+    if (payload is List) {
+      return payload
+          .whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList(growable: false);
+    }
+
+    if (payload is Map) {
+      final list = payload['list'];
+      if (list is List) {
+        return list
+            .whereType<Map>()
+            .map((entry) => Map<String, dynamic>.from(entry))
+            .toList(growable: false);
+      }
+
+      return [Map<String, dynamic>.from(payload)];
+    }
+
+    throw FormatException(
+      'Expected AniLibria list payload, got ${payload.runtimeType}.',
+    );
+  }
+
+  Map<String, dynamic>? _readMap(dynamic value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+
+    return null;
+  }
+
+  List<String> _readStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map(_readString)
+          .whereType<String>()
+          .where((entry) => entry.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    return const [];
+  }
+
+  String? _readString(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    return switch (value) {
+      String value => value,
+      int value => value.toString(),
+      _ => null,
+    };
+  }
+
+  int? _readInt(dynamic value) {
+    return switch (value) {
+      int value => value,
+      num value => value.toInt(),
+      String value => int.tryParse(value),
+      _ => null,
+    };
+  }
+
+  bool? _readBool(dynamic value) {
+    return switch (value) {
+      bool value => value,
+      int value => value != 0,
+      String value => value == 'true' || value == '1',
+      _ => null,
+    };
+  }
+
+  DateTime? _readDateTime(dynamic value) {
+    return switch (value) {
+      DateTime value => value,
+      int value => DateTime.fromMillisecondsSinceEpoch(
+        value * 1000,
+        isUtc: true,
+      ),
+      String value => DateTime.tryParse(value),
+      _ => null,
+    };
+  }
+}
+
+===== FILE: lib/data/repositories/anilibria/anilibria_series_repository.dart =====
+import '../../../domain/models/episode.dart';
+import '../../../domain/models/series.dart';
+import '../../../domain/repositories/series_repository.dart';
+import '../../adapters/anilibria/anilibria_remote_data_source.dart';
+import '../../mappers/anilibria/anilibria_episode_mapper.dart';
+import '../../mappers/anilibria/anilibria_series_mapper.dart';
+
+class AniLibriaSeriesRepository implements SeriesRepository {
+  AniLibriaSeriesRepository({
+    required AnilibriaRemoteDataSource remoteDataSource,
+    required AnilibriaSeriesMapper seriesMapper,
+    required AnilibriaEpisodeMapper episodeMapper,
+  }) : _remoteDataSource = remoteDataSource,
+       _seriesMapper = seriesMapper,
+       _episodeMapper = episodeMapper;
+
+  final AnilibriaRemoteDataSource _remoteDataSource;
+  final AnilibriaSeriesMapper _seriesMapper;
+  final AnilibriaEpisodeMapper _episodeMapper;
+
+  @override
+  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
+    final releases = await _remoteDataSource.fetchFeaturedReleases(
+      limit: limit,
+    );
+    return releases.map(_seriesMapper.mapRelease).toList(growable: false);
+  }
+
+  @override
+  Future<List<Series>> getTrendingSeries({int limit = 20}) async {
+    final releases = await _remoteDataSource.fetchTrendingReleases(
+      limit: limit,
+    );
+    return releases.map(_seriesMapper.mapRelease).toList(growable: false);
+  }
+
+  @override
+  Future<List<Series>> getPopularSeries({int limit = 20}) async {
+    final releases = await _remoteDataSource.fetchPopularReleases(limit: limit);
+    return releases.map(_seriesMapper.mapRelease).toList(growable: false);
+  }
+
+  @override
+  Future<List<Series>> searchSeries(String query, {int limit = 20}) async {
+    final releases = await _remoteDataSource.searchReleases(
+      query,
+      limit: limit,
+    );
+    return releases.map(_seriesMapper.mapRelease).toList(growable: false);
+  }
+
+  @override
+  Future<Series> getSeriesById(String seriesId) async {
+    final release = await _remoteDataSource.fetchReleaseDetails(seriesId);
+    return _seriesMapper.mapRelease(release);
+  }
+
+  @override
+  Future<List<Episode>> getEpisodes(String seriesId) async {
+    final episodes = await _remoteDataSource.fetchReleaseEpisodes(seriesId);
+    return episodes
+        .map(
+          (episode) =>
+              _episodeMapper.mapEpisode(dto: episode, seriesId: seriesId),
+        )
+        .toList(growable: false);
+  }
+}
+
+===== FILE: lib/data/mappers/anilibria/anilibria_series_mapper.dart =====
+import '../../../domain/models/availability_state.dart';
+import '../../../domain/models/series.dart';
+import '../../dto/anilibria/anilibria_release_dto.dart';
+
+class AnilibriaSeriesMapper {
+  const AnilibriaSeriesMapper();
+
+  Series mapRelease(AnilibriaReleaseDto dto) {
+    return Series(
+      id: dto.id,
+      slug: dto.code ?? dto.id,
+      title: dto.names.main ?? dto.names.english ?? dto.id,
+      originalTitle: dto.names.english,
+      synopsis: dto.description,
+      posterImageUrl: dto.images?.posterUrl,
+      bannerImageUrl: dto.images?.bannerUrl,
+      genres: dto.genres,
+      releaseYear: dto.releaseYear,
+      availability: const AvailabilityState(),
+      lastUpdatedAt: dto.updatedAt,
+    );
+  }
+}
+
+===== FILE: lib/data/mappers/anilibria/anilibria_episode_mapper.dart =====
+import '../../../domain/models/availability_state.dart';
+import '../../../domain/models/episode.dart';
+import '../../dto/anilibria/anilibria_episode_dto.dart';
+
+class AnilibriaEpisodeMapper {
+  const AnilibriaEpisodeMapper();
+
+  Episode mapEpisode({
+    required AnilibriaEpisodeDto dto,
+    required String seriesId,
+    String? seasonId,
+  }) {
+    return Episode(
+      id: dto.id,
+      seriesId: seriesId,
+      sortOrder: dto.ordinal,
+      numberLabel: dto.ordinal.toString(),
+      title: dto.title ?? 'Episode ${dto.ordinal}',
+      synopsis: dto.description,
+      duration: dto.durationSeconds == null
+          ? null
+          : Duration(seconds: dto.durationSeconds!),
+      thumbnailImageUrl: dto.thumbnailUrl,
+      airDate: dto.airedAt,
+      isFiller: dto.isFiller,
+      isRecap: dto.isRecap,
+      availability: const AvailabilityState(),
+    );
+  }
+}
+
+===== FILE: lib/features/home/home_screen.dart =====
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../app/series/series_providers.dart';
+import '../../domain/models/series.dart';
+
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final featuredSeries = ref.watch(featuredSeriesProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Home')),
+      body: featuredSeries.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Failed to load featured series.\n$error',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        data: (seriesList) => _HomeDiscoveryView(seriesList: seriesList),
+      ),
+    );
+  }
+}
+
+class _HomeDiscoveryView extends StatelessWidget {
+  const _HomeDiscoveryView({required this.seriesList});
+
+  final List<Series> seriesList;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        _DiscoveryHeader(itemCount: seriesList.length),
+        const SizedBox(height: 16),
+        if (seriesList.isEmpty)
+          const _EmptyDiscoveryState()
+        else ...[
+          _FeaturedSpotlight(series: seriesList.first),
+          const SizedBox(height: 24),
+          _FeaturedCatalog(seriesList: seriesList),
+        ],
+      ],
+    );
+  }
+}
+
+class _DiscoveryHeader extends StatelessWidget {
+  const _DiscoveryHeader({required this.itemCount});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.45,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Discover',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text('Featured anime picks', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          Text(
+            'Currently loaded: $itemCount series',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeaturedSpotlight extends StatelessWidget {
+  const _FeaturedSpotlight({required this.series});
+
+  final Series series;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final metadata = <String>[
+      if (series.releaseYear != null) '${series.releaseYear}',
+      if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
+    ].join('  •  ');
+
+    return _SectionCard(
+      title: 'Featured Now',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(series.title, style: theme.textTheme.titleLarge),
+          if ((series.originalTitle ?? '').trim().isNotEmpty &&
+              series.originalTitle != series.title) ...[
+            const SizedBox(height: 4),
+            Text(
+              series.originalTitle!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (metadata.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              metadata,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              series.synopsis!,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FeaturedCatalog extends StatelessWidget {
+  const _FeaturedCatalog({required this.seriesList});
+
+  final List<Series> seriesList;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return _SectionCard(
+      title: 'Browse Featured',
+      trailing: Text(
+        '${seriesList.length}',
+        style: theme.textTheme.titleMedium,
+      ),
+      child: Column(
+        children: [
+          for (var index = 0; index < seriesList.length; index++) ...[
+            if (index > 0) const Divider(height: 1),
+            _SeriesRow(series: seriesList[index]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SeriesRow extends StatelessWidget {
+  const _SeriesRow({required this.series});
+
+  final Series series;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final metadata = <String>[
+      if (series.releaseYear != null) '${series.releaseYear}',
+      if (series.genres.isNotEmpty) series.genres.first,
+    ].join('  •  ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(series.title, style: theme.textTheme.titleMedium),
+          if ((series.originalTitle ?? '').trim().isNotEmpty &&
+              series.originalTitle != series.title) ...[
+            const SizedBox(height: 2),
+            Text(
+              series.originalTitle!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (metadata.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              metadata,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyDiscoveryState extends StatelessWidget {
+  const _EmptyDiscoveryState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SectionCard(
+      title: 'Featured',
+      child: Text('No featured series are available right now.'),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child, this.trailing});
+
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+              ...?trailing == null ? null : [trailing!],
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+===== FILE: lib/features/series/series_screen.dart =====
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../app/series/series_details_data.dart';
+import '../../app/series/series_providers.dart';
+import '../../domain/models/episode.dart';
+import '../../domain/models/series.dart';
+
+class SeriesScreen extends ConsumerWidget {
+  const SeriesScreen({super.key, required this.seriesId});
+
+  final String seriesId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final seriesDetails = ref.watch(seriesDetailsProvider(seriesId));
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Series')),
+      body: seriesDetails.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Failed to load series $seriesId.\n$error',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        data: (details) => _SeriesPage(details: details),
+      ),
+    );
+  }
+}
+
+class _SeriesPage extends StatelessWidget {
+  const _SeriesPage({required this.details});
+
+  final SeriesDetailsData details;
+
+  @override
+  Widget build(BuildContext context) {
+    final series = details.series;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        _IdentitySection(series: series),
+        const SizedBox(height: 16),
+        _MetadataSection(series: series, episodeCount: details.episodes.length),
+        if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _SynopsisSection(synopsis: series.synopsis!.trim()),
+        ],
+        const SizedBox(height: 24),
+        _EpisodesSection(episodes: details.episodes),
+      ],
+    );
+  }
+}
+
+class _IdentitySection extends StatelessWidget {
+  const _IdentitySection({required this.series});
+
+  final Series series;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.45,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Series',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(series.title, style: theme.textTheme.headlineSmall),
+          if ((series.originalTitle ?? '').trim().isNotEmpty &&
+              series.originalTitle != series.title) ...[
+            const SizedBox(height: 6),
+            Text(
+              series.originalTitle!,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MetadataSection extends StatelessWidget {
+  const _MetadataSection({required this.series, required this.episodeCount});
+
+  final Series series;
+  final int episodeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final metadata = <String>[
+      if (series.releaseYear != null) 'Year ${series.releaseYear}',
+      if (series.genres.isNotEmpty) series.genres.take(3).join(' • '),
+      'Episodes $episodeCount',
+    ];
+
+    return _SectionCard(
+      title: 'Metadata',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: metadata
+            .map(
+              (item) =>
+                  Chip(label: Text(item), visualDensity: VisualDensity.compact),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+}
+
+class _SynopsisSection extends StatelessWidget {
+  const _SynopsisSection({required this.synopsis});
+
+  final String synopsis;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(title: 'Synopsis', child: Text(synopsis));
+  }
+}
+
+class _EpisodesSection extends StatelessWidget {
+  const _EpisodesSection({required this.episodes});
+
+  final List<Episode> episodes;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return _SectionCard(
+      title: 'Episodes',
+      trailing: Text('${episodes.length}', style: theme.textTheme.titleMedium),
+      child: episodes.isEmpty
+          ? const Text('Episodes are not available yet.')
+          : Column(
+              children: [
+                for (var index = 0; index < episodes.length; index++) ...[
+                  if (index > 0) const Divider(height: 1),
+                  _EpisodeRow(episode: episodes[index]),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _EpisodeRow extends StatelessWidget {
+  const _EpisodeRow({required this.episode});
+
+  final Episode episode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final subtitleParts = <String>[
+      if (episode.duration != null) '${episode.duration!.inMinutes} min',
+      if (episode.isRecap) 'Recap',
+      if (episode.isFiller) 'Filler',
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              'Ep ${episode.numberLabel}',
+              style: theme.textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(episode.title, style: theme.textTheme.titleMedium),
+                if (subtitleParts.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitleParts.join('  •  '),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if ((episode.synopsis ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    episode.synopsis!,
+                    style: theme.textTheme.bodyMedium,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child, this.trailing});
+
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+              ...?trailing == null ? null : [trailing!],
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+===== FILE: test/data/repositories/anilibria/anilibria_series_repository_test.dart =====
+import 'package:dio/dio.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:anime_stream_app/data/adapters/anilibria/dio_anilibria_remote_data_source.dart';
+import 'package:anime_stream_app/data/dto/anilibria/anilibria_episode_dto.dart';
+import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_dto.dart';
+import 'package:anime_stream_app/data/mappers/anilibria/anilibria_episode_mapper.dart';
+import 'package:anime_stream_app/data/mappers/anilibria/anilibria_series_mapper.dart';
+import 'package:anime_stream_app/data/repositories/anilibria/anilibria_series_repository.dart';
+import 'package:anime_stream_app/domain/models/availability_state.dart';
+import 'package:anime_stream_app/domain/models/episode.dart';
+import 'package:anime_stream_app/domain/models/series.dart';
+
+void main() {
+  group('AniLibriaSeriesRepository', () {
+    test('maps featured series from a wrapped list response', () async {
+      final repository = _buildRepository((options) async {
+        expect(options.path, 'title/updates');
+        expect(options.queryParameters['limit'], 1);
+
+        return {
+          'list': [
+            _releasePayload(
+              id: '9000',
+              code: 'kizumonogatari-iii',
+              ruName: 'Истории ран',
+              enName: 'Kizumonogatari III',
+              genres: ['Вампиры', 'Экшен'],
+              updated: 1624984055,
+              seasonYear: 2017,
+            ),
+          ],
+        };
+      });
+
+      final seriesList = await repository.getFeaturedSeries(limit: 1);
+
+      expect(seriesList, hasLength(1));
+
+      final series = seriesList.single;
+      expect(series, isA<Series>());
+      expect(series, isNot(isA<AnilibriaReleaseDto>()));
+      expect(series.id, '9000');
+      expect(series.slug, 'kizumonogatari-iii');
+      expect(series.title, 'Истории ран');
+      expect(series.originalTitle, 'Kizumonogatari III');
+      expect(series.genres, ['Вампиры', 'Экшен']);
+      expect(
+        series.posterImageUrl,
+        '/storage/releases/posters/9000/poster-medium.jpg',
+      );
+      expect(series.releaseYear, 2017);
+      expect(series.status, SeriesStatus.unknown);
+      expect(series.availability.status, AvailabilityStatus.available);
+      expect(
+        series.lastUpdatedAt,
+        DateTime.fromMillisecondsSinceEpoch(1624984055 * 1000, isUtc: true),
+      );
+    });
+
+    test('maps search results from a raw list response', () async {
+      final repository = _buildRepository((options) async {
+        expect(options.path, 'title/search');
+        expect(options.queryParameters['search'], 'fate');
+        expect(options.queryParameters['limit'], 2);
+
+        return [
+          _releasePayload(
+            id: '42',
+            code: 'fate-apocrypha',
+            ruName: 'Судьба/Апокриф',
+            enName: 'Fate/Apocrypha',
+            releaseYear: 2017,
+            updated: 1700000000,
+          ),
+        ];
+      });
+
+      final results = await repository.searchSeries('fate', limit: 2);
+
+      expect(results, hasLength(1));
+      expect(results.single, isA<Series>());
+      expect(results.single, isNot(isA<AnilibriaReleaseDto>()));
+      expect(results.single.id, '42');
+      expect(results.single.slug, 'fate-apocrypha');
+      expect(results.single.title, 'Судьба/Апокриф');
+      expect(results.single.originalTitle, 'Fate/Apocrypha');
+      expect(results.single.releaseYear, 2017);
+    });
+
+    test('maps series details from a title payload', () async {
+      final repository = _buildRepository((options) async {
+        expect(options.path, 'title');
+        expect(options.queryParameters['id'], '77');
+
+        return _releasePayload(
+          id: '77',
+          code: 'frieren',
+          ruName: 'Провожающая в последний путь Фрирен',
+          enName: 'Frieren: Beyond Journey\'s End',
+          releaseYear: 2023,
+          description: 'Journey after the adventure.',
+          updated: 1710000000,
+          playerList: {
+            '1': {'uuid': 'ep-1', 'episode': 1, 'name': 'Departure'},
+          },
+        );
+      });
+
+      final series = await repository.getSeriesById('77');
+
+      expect(series, isA<Series>());
+      expect(series.id, '77');
+      expect(series.slug, 'frieren');
+      expect(series.title, 'Провожающая в последний путь Фрирен');
+      expect(series.synopsis, 'Journey after the adventure.');
+      expect(series.releaseYear, 2023);
+      expect(series.posterImageUrl, isNotNull);
+    });
+
+    test('maps episodes from player.list object payloads', () async {
+      final repository = _buildRepository((options) async {
+        expect(options.path, 'title');
+        expect(options.queryParameters['id'], '101');
+
+        return _releasePayload(
+          id: '101',
+          code: 'monster',
+          ruName: 'Монстр',
+          enName: 'Monster',
+          playerList: {
+            '1': {
+              'uuid': 'episode-1',
+              'name': 'Herr Dr. Tenma',
+              'created_timestamp': 1712000000,
+              'preview': '/episodes/101/1.jpg',
+            },
+            '2': {
+              'uuid': 'episode-2',
+              'description': 'A difficult choice.',
+              'duration': 1440,
+              'preview': '/episodes/101/2.jpg',
+              'is_filler': 1,
+            },
+          },
+        );
+      });
+
+      final episodes = await repository.getEpisodes('101');
+
+      expect(episodes, hasLength(2));
+      expect(episodes.first, isA<Episode>());
+      expect(episodes.first, isNot(isA<AnilibriaEpisodeDto>()));
+      expect(episodes.first.id, 'episode-1');
+      expect(episodes.first.seriesId, '101');
+      expect(episodes.first.sortOrder, 1);
+      expect(episodes.first.numberLabel, '1');
+      expect(episodes.first.title, 'Herr Dr. Tenma');
+      expect(episodes.first.thumbnailImageUrl, '/episodes/101/1.jpg');
+      expect(
+        episodes.first.airDate,
+        DateTime.fromMillisecondsSinceEpoch(1712000000 * 1000, isUtc: true),
+      );
+      expect(episodes.last.sortOrder, 2);
+      expect(episodes.last.title, 'Episode 2');
+      expect(episodes.last.synopsis, 'A difficult choice.');
+      expect(episodes.last.duration, const Duration(seconds: 1440));
+      expect(episodes.last.isFiller, isTrue);
+      expect(episodes.last.availability.status, AvailabilityStatus.available);
+    });
+
+    test('maps episodes from player.list array payloads', () async {
+      final repository = _buildRepository((options) async {
+        expect(options.path, 'title');
+        expect(options.queryParameters['id'], '202');
+
+        return _releasePayload(
+          id: '202',
+          code: 'haikyuu',
+          ruName: 'Волейбол!!',
+          enName: 'Haikyuu!!',
+          playerList: [
+            {
+              'uuid': 'haikyuu-1',
+              'episode': 1,
+              'name': 'The End & The Beginning',
+              'created_timestamp': 1713000000,
+            },
+            {
+              'id': 'haikyuu-2',
+              'ordinal': 2,
+              'title': 'Karasuno High School Volleyball Club',
+              'duration_seconds': 1450,
+              'aired_at': '2024-04-15T00:00:00Z',
+              'isRecap': true,
+            },
+          ],
+        );
+      });
+
+      final episodes = await repository.getEpisodes('202');
+
+      expect(episodes, hasLength(2));
+      expect(episodes.first.id, 'haikyuu-1');
+      expect(episodes.first.title, 'The End & The Beginning');
+      expect(episodes[1].id, 'haikyuu-2');
+      expect(episodes[1].sortOrder, 2);
+      expect(episodes[1].title, 'Karasuno High School Volleyball Club');
+      expect(episodes[1].duration, const Duration(seconds: 1450));
+      expect(episodes[1].airDate, DateTime.parse('2024-04-15T00:00:00Z'));
+      expect(episodes[1].isRecap, isTrue);
+    });
+  });
+}
+
+AniLibriaSeriesRepository _buildRepository(_PayloadResponder responder) {
+  final dio = Dio(BaseOptions(baseUrl: DioAnilibriaRemoteDataSource.apiBaseUrl))
+    ..interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final payload = await responder(options);
+          handler.resolve(
+            Response<dynamic>(
+              requestOptions: options,
+              data: payload,
+              statusCode: 200,
+            ),
+          );
+        },
+      ),
+    );
+
+  final remoteDataSource = DioAnilibriaRemoteDataSource(dio: dio);
+
+  return AniLibriaSeriesRepository(
+    remoteDataSource: remoteDataSource,
+    seriesMapper: const AnilibriaSeriesMapper(),
+    episodeMapper: const AnilibriaEpisodeMapper(),
+  );
+}
+
+typedef _PayloadResponder = Future<dynamic> Function(RequestOptions options);
+
+Map<String, Object?> _releasePayload({
+  required String id,
+  required String code,
+  required String ruName,
+  required String enName,
+  List<String> genres = const ['Драма'],
+  String description = 'Provider description',
+  int? releaseYear,
+  int? seasonYear,
+  int updated = 1711111111,
+  Object? playerList,
+}) {
+  return {
+    'id': id,
+    'code': code,
+    'names': {
+      'ru': ruName,
+      'en': enName,
+      'alternative': ['Alt title'],
+    },
+    'description': description,
+    'genres': genres,
+    'posters': {
+      'small': {'url': '/storage/releases/posters/$id/poster-small.jpg'},
+      'medium': {'url': '/storage/releases/posters/$id/poster-medium.jpg'},
+      'original': {'url': '/storage/releases/posters/$id/poster-original.jpg'},
+    },
+    ...?releaseYear == null ? null : {'releaseYear': releaseYear},
+    ...?seasonYear == null
+        ? null
+        : {
+            'season': {'year': seasonYear},
+          },
+    'updated': updated,
+    'status': {'code': 1, 'string': 'ongoing'},
+    ...?playerList == null
+        ? null
+        : {
+            'player': {'list': playerList},
+          },
+  };
+}
+
+Missing requested files:
+none

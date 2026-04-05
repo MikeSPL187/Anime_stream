@@ -14,7 +14,7 @@ class AnilibriaEpisodeMapper {
       id: dto.id,
       seriesId: seriesId,
       sortOrder: dto.ordinal,
-      numberLabel: dto.ordinal.toString(),
+      numberLabel: dto.numberLabel ?? dto.ordinal.toString(),
       title: dto.title ?? 'Episode ${dto.ordinal}',
       synopsis: dto.description,
       duration: dto.durationSeconds == null

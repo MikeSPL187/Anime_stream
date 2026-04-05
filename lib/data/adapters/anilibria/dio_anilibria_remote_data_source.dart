@@ -1,16 +1,14 @@
 import 'package:dio/dio.dart';
 
 import '../../dto/anilibria/anilibria_episode_dto.dart';
+import '../../dto/anilibria/anilibria_release_page_dto.dart';
 import '../../dto/anilibria/anilibria_release_dto.dart';
 import 'anilibria_remote_data_source.dart';
 
 class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
   DioAnilibriaRemoteDataSource({required Dio dio}) : _dio = dio;
 
-  static const apiBaseUrl = 'https://api.anilibria.tv/v3/';
-  static const _seriesFilter =
-      'id,code,names,description,genres,posters,updated,season,status';
-  static const _episodesFilter = 'id,player.list';
+  static const apiBaseUrl = 'https://anilibria.top/api/v1/';
 
   final Dio _dio;
 
@@ -19,8 +17,8 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     int limit = 20,
   }) async {
     final payload = await _getJson(
-      'title/updates',
-      queryParameters: {..._defaultQueryParameters(limit: limit)},
+      'anime/releases/latest',
+      queryParameters: {'limit': limit},
     );
 
     return _parseReleaseList(payload);
@@ -31,8 +29,12 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     int limit = 20,
   }) async {
     final payload = await _getJson(
-      'title/changes',
-      queryParameters: {..._defaultQueryParameters(limit: limit)},
+      'anime/catalog/releases',
+      queryParameters: {
+        'limit': limit,
+        'f[publish_statuses]': 'IS_ONGOING',
+        'f[sorting]': 'FRESH_AT_DESC',
+      },
     );
 
     return _parseReleaseList(payload);
@@ -43,27 +45,30 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     int limit = 20,
   }) async {
     final payload = await _getJson(
-      'title/search/advanced',
-      queryParameters: {
-        ..._defaultQueryParameters(limit: limit),
-        'simple_query': 'status.code==1',
-        'order_by': 'in_favorites',
-        'sort_direction': 1,
-      },
+      'anime/catalog/releases',
+      queryParameters: {'limit': limit, 'f[sorting]': 'RATING_DESC'},
     );
 
     return _parseReleaseList(payload);
   }
 
   @override
+  Future<AnilibriaReleasePageDto> fetchCatalogPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final payload = await _getJson(
+      'anime/catalog/releases',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+
+    return _parseReleasePage(payload);
+  }
+
+  @override
   Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) async {
     final payload = await _getJson(
-      'title',
-      queryParameters: {
-        'id': releaseId,
-        'filter': '$_seriesFilter,player.list',
-        'playlist_type': 'array',
-      },
+      'anime/releases/${Uri.encodeComponent(releaseId)}',
     );
 
     return _parseRelease(_extractObject(payload));
@@ -74,12 +79,7 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     String releaseId,
   ) async {
     final payload = await _getJson(
-      'title',
-      queryParameters: {
-        'id': releaseId,
-        'filter': _episodesFilter,
-        'playlist_type': 'array',
-      },
+      'anime/releases/${Uri.encodeComponent(releaseId)}',
     );
 
     return _parseRelease(_extractObject(payload)).episodes;
@@ -91,14 +91,11 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     int limit = 20,
   }) async {
     final payload = await _getJson(
-      'title/search',
-      queryParameters: {
-        ..._defaultQueryParameters(limit: limit),
-        'search': query,
-      },
+      'app/search/releases',
+      queryParameters: {'query': query},
     );
 
-    return _parseReleaseList(payload);
+    return _parseReleaseList(payload).take(limit).toList(growable: false);
   }
 
   @override
@@ -106,12 +103,11 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     int limit = 20,
   }) async {
     final payload = await _getJson(
-      'title/search/advanced',
+      'anime/catalog/releases',
       queryParameters: {
-        ..._defaultQueryParameters(limit: limit),
-        'simple_query': 'status.code==1',
-        'order_by': 'updated',
-        'sort_direction': 1,
+        'limit': limit,
+        'f[publish_statuses]': 'IS_ONGOING',
+        'f[sorting]': 'FRESH_AT_DESC',
       },
     );
 
@@ -131,20 +127,45 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     return response.data;
   }
 
-  Map<String, Object?> _defaultQueryParameters({required int limit}) {
-    return {'filter': _seriesFilter, 'limit': limit};
-  }
-
   List<AnilibriaReleaseDto> _parseReleaseList(dynamic payload) {
     final rawList = _extractList(payload);
     return rawList.map(_parseRelease).toList(growable: false);
   }
 
+  AnilibriaReleasePageDto _parseReleasePage(dynamic payload) {
+    final root = _extractObject(payload);
+    final paginationJson = _readMap(_readMap(root['meta'])?['pagination']);
+    if (paginationJson == null) {
+      throw const FormatException(
+        'AniLibria catalog payload is missing pagination metadata.',
+      );
+    }
+
+    final currentPage = _readInt(paginationJson['current_page']);
+    final perPage = _readInt(paginationJson['per_page']);
+    final totalItems = _readInt(paginationJson['total']);
+    final totalPages = _readInt(paginationJson['total_pages']);
+    if (currentPage == null ||
+        perPage == null ||
+        totalItems == null ||
+        totalPages == null) {
+      throw const FormatException(
+        'AniLibria catalog pagination metadata is incomplete.',
+      );
+    }
+
+    return AnilibriaReleasePageDto(
+      releases: _parseReleaseList(root),
+      currentPage: currentPage,
+      perPage: perPage,
+      totalItems: totalItems,
+      totalPages: totalPages,
+    );
+  }
+
   AnilibriaReleaseDto _parseRelease(Map<String, dynamic> json) {
     final releaseId = _readString(json['id']);
-    final namesJson = _readMap(json['names']);
-    final seasonJson = _readMap(json['season']);
-    final statusJson = _readMap(json['status']);
+    final nameJson = _readMap(json['name']);
 
     if (releaseId == null || releaseId.isEmpty) {
       throw const FormatException('AniLibria release is missing an id.');
@@ -152,32 +173,22 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
 
     return AnilibriaReleaseDto(
       id: releaseId,
-      code: _readString(json['code']),
+      code: _readString(json['alias']),
       names: AnilibriaNamesDto(
-        main: _readString(namesJson?['ru']) ?? _readString(namesJson?['main']),
-        english:
-            _readString(namesJson?['en']) ?? _readString(namesJson?['english']),
-        alternative: _readStringList(namesJson?['alternative']),
+        main: _readString(nameJson?['main']),
+        english: _readString(nameJson?['english']),
+        alternative: _readAlternativeNames(nameJson?['alternative']),
       ),
       description: _readString(json['description']),
-      genres: _readStringList(json['genres']),
-      images: AnilibriaImageSetDto(
-        posterUrl: _extractPosterUrl(json),
-        bannerUrl: _extractBannerUrl(json),
-      ),
-      releaseYear:
-          _readInt(json['releaseYear']) ??
-          _readInt(json['release_year']) ??
-          _readInt(seasonJson?['year']),
+      genres: _readGenres(json['genres']),
+      images: AnilibriaImageSetDto(posterUrl: _extractPosterUrl(json)),
+      releaseYear: _readInt(json['year']),
       updatedAt:
-          _readDateTime(json['updatedAt']) ??
-          _readDateTime(json['updated']) ??
-          _readDateTime(json['last_change']),
+          _readDateTime(json['updated_at']) ??
+          _readDateTime(json['fresh_at']) ??
+          _readDateTime(json['created_at']),
       episodes: _parseEpisodes(json, releaseId: releaseId),
-      raw: {
-        ...Map<String, Object?>.from(json),
-        ...?statusJson == null ? null : {'status': statusJson},
-      },
+      raw: Map<String, Object?>.from(json),
     );
   }
 
@@ -193,27 +204,10 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
           .toList(growable: false);
     }
 
-    final playerJson = _readMap(releaseJson['player']);
-    final playerList = playerJson?['list'];
-
-    if (playerList is List) {
-      return playerList
-          .map((entry) => _parseEpisode(entry, releaseId: releaseId))
-          .whereType<AnilibriaEpisodeDto>()
-          .toList(growable: false);
-    }
-
-    if (playerList is Map) {
-      return playerList.entries
-          .map(
-            (entry) => _parseEpisode(
-              entry.value,
-              releaseId: releaseId,
-              fallbackOrdinal: _readInt(entry.key),
-            ),
-          )
-          .whereType<AnilibriaEpisodeDto>()
-          .toList(growable: false);
+    final latestEpisodeJson = _readMap(releaseJson['latest_episode']);
+    if (latestEpisodeJson != null) {
+      final episode = _parseEpisode(latestEpisodeJson, releaseId: releaseId);
+      return episode == null ? const [] : [episode];
     }
 
     return const [];
@@ -222,71 +216,112 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
   AnilibriaEpisodeDto? _parseEpisode(
     dynamic payload, {
     required String releaseId,
-    int? fallbackOrdinal,
   }) {
     final json = _readMap(payload);
     if (json == null) {
       return null;
     }
 
-    final ordinal =
-        _readInt(json['episode']) ??
-        _readInt(json['ordinal']) ??
-        fallbackOrdinal;
-    if (ordinal == null) {
+    final parsedOrdinal = _readOrdinal(json['ordinal']);
+    if (parsedOrdinal == null) {
       return null;
     }
 
     return AnilibriaEpisodeDto(
-      id:
-          _readString(json['uuid']) ??
-          _readString(json['id']) ??
-          '$releaseId-$ordinal',
-      releaseId: _readString(json['releaseId']) ?? releaseId,
-      ordinal: ordinal,
-      title: _readString(json['name']) ?? _readString(json['title']),
-      description: _readString(json['description']),
-      durationSeconds:
-          _readInt(json['duration']) ?? _readInt(json['duration_seconds']),
-      thumbnailUrl:
-          _readString(json['preview']) ?? _readString(json['thumbnail']),
-      airedAt:
-          _readDateTime(json['airedAt']) ??
-          _readDateTime(json['aired_at']) ??
-          _readDateTime(json['created_timestamp']),
-      isFiller:
-          _readBool(json['is_filler']) ?? _readBool(json['isFiller']) ?? false,
-      isRecap:
-          _readBool(json['is_recap']) ?? _readBool(json['isRecap']) ?? false,
+      id: _readString(json['id']) ?? '$releaseId-${parsedOrdinal.numberLabel}',
+      releaseId: _readString(json['release_id']) ?? releaseId,
+      ordinal: parsedOrdinal.sortOrder,
+      numberLabel: parsedOrdinal.numberLabel,
+      title:
+          _readString(json['name']) ??
+          _readString(json['name_english']) ??
+          'Episode ${parsedOrdinal.numberLabel}',
+      durationSeconds: _readInt(json['duration']),
+      thumbnailUrl: _extractEpisodePreviewUrl(json),
+      hls480Url: _readString(json['hls_480']),
+      hls720Url: _readString(json['hls_720']),
+      hls1080Url: _readString(json['hls_1080']),
+      airedAt: null,
       raw: Map<String, Object?>.from(json),
     );
   }
 
-  String? _extractPosterUrl(Map<String, dynamic> json) {
-    final imagesJson = _readMap(json['images']);
-    if (imagesJson != null) {
-      return _readString(imagesJson['posterUrl']) ??
-          _readString(imagesJson['poster_url']);
+  List<String> _readAlternativeNames(dynamic value) {
+    if (value == null) {
+      return const [];
     }
 
-    final postersJson = _readMap(json['posters']);
-    if (postersJson == null) {
-      return null;
+    if (value is List) {
+      return value
+          .map(_readString)
+          .whereType<String>()
+          .where((entry) => entry.isNotEmpty)
+          .toList(growable: false);
     }
 
-    return _readString(_readMap(postersJson['medium'])?['url']) ??
-        _readString(_readMap(postersJson['small'])?['url']) ??
-        _readString(_readMap(postersJson['original'])?['url']);
+    final singleValue = _readString(value);
+    return singleValue == null || singleValue.isEmpty
+        ? const []
+        : [singleValue];
   }
 
-  String? _extractBannerUrl(Map<String, dynamic> json) {
-    final imagesJson = _readMap(json['images']);
-    if (imagesJson == null) {
-      return null;
+  List<String> _readGenres(dynamic value) {
+    if (value is List) {
+      return value
+          .map((entry) {
+            final genreJson = _readMap(entry);
+            return _readString(genreJson?['name']) ?? _readString(entry);
+          })
+          .whereType<String>()
+          .where((entry) => entry.isNotEmpty)
+          .toList(growable: false);
     }
 
-    return _readString(imagesJson['bannerUrl']) ??
-        _readString(imagesJson['banner_url']);
+    return const [];
+  }
+
+  String? _extractPosterUrl(Map<String, dynamic> json) {
+    final posterJson = _readMap(json['poster']);
+    final optimizedJson = _readMap(posterJson?['optimized']);
+
+    return _readString(optimizedJson?['preview']) ??
+        _readString(optimizedJson?['src']) ??
+        _readString(posterJson?['preview']) ??
+        _readString(posterJson?['src']) ??
+        _readString(posterJson?['thumbnail']);
+  }
+
+  String? _extractEpisodePreviewUrl(Map<String, dynamic> json) {
+    final previewJson = _readMap(json['preview']);
+    final optimizedJson = _readMap(previewJson?['optimized']);
+
+    return _readString(optimizedJson?['thumbnail']) ??
+        _readString(optimizedJson?['preview']) ??
+        _readString(optimizedJson?['src']) ??
+        _readString(previewJson?['thumbnail']) ??
+        _readString(previewJson?['preview']) ??
+        _readString(previewJson?['src']);
+  }
+
+  _ParsedOrdinal? _readOrdinal(dynamic value) {
+    return switch (value) {
+      int value => _ParsedOrdinal(
+        sortOrder: value,
+        numberLabel: value.toString(),
+      ),
+      num value => _ParsedOrdinal(
+        sortOrder: value == value.toInt()
+            ? value.toInt()
+            : (value.toDouble() * 1000).round(),
+        numberLabel: _formatOrdinalLabel(value),
+      ),
+      String value => _readOrdinal(num.tryParse(value)),
+      _ => null,
+    };
+  }
+
+  String _formatOrdinalLabel(num value) {
+    return value == value.toInt() ? value.toInt().toString() : value.toString();
   }
 
   Map<String, dynamic> _extractObject(dynamic payload) {
@@ -308,6 +343,14 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     }
 
     if (payload is Map) {
+      final data = payload['data'];
+      if (data is List) {
+        return data
+            .whereType<Map>()
+            .map((entry) => Map<String, dynamic>.from(entry))
+            .toList(growable: false);
+      }
+
       final list = payload['list'];
       if (list is List) {
         return list
@@ -332,18 +375,6 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     return null;
   }
 
-  List<String> _readStringList(dynamic value) {
-    if (value is List) {
-      return value
-          .map(_readString)
-          .whereType<String>()
-          .where((entry) => entry.isNotEmpty)
-          .toList(growable: false);
-    }
-
-    return const [];
-  }
-
   String? _readString(dynamic value) {
     if (value == null) {
       return null;
@@ -352,6 +383,7 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     return switch (value) {
       String value => value,
       int value => value.toString(),
+      double value => value.toString(),
       _ => null,
     };
   }
@@ -365,24 +397,18 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
     };
   }
 
-  bool? _readBool(dynamic value) {
-    return switch (value) {
-      bool value => value,
-      int value => value != 0,
-      String value => value == 'true' || value == '1',
-      _ => null,
-    };
-  }
-
   DateTime? _readDateTime(dynamic value) {
     return switch (value) {
       DateTime value => value,
-      int value => DateTime.fromMillisecondsSinceEpoch(
-        value * 1000,
-        isUtc: true,
-      ),
       String value => DateTime.tryParse(value),
       _ => null,
     };
   }
+}
+
+class _ParsedOrdinal {
+  const _ParsedOrdinal({required this.sortOrder, required this.numberLabel});
+
+  final int sortOrder;
+  final String numberLabel;
 }

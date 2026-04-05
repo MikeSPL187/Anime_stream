@@ -1,4 +1,5 @@
 import '../../dto/anilibria/anilibria_episode_dto.dart';
+import '../../dto/anilibria/anilibria_release_page_dto.dart';
 import '../../dto/anilibria/anilibria_release_dto.dart';
 
 abstract interface class AnilibriaRemoteDataSource {
@@ -7,6 +8,11 @@ abstract interface class AnilibriaRemoteDataSource {
   Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20});
 
   Future<List<AnilibriaReleaseDto>> fetchPopularReleases({int limit = 20});
+
+  Future<AnilibriaReleasePageDto> fetchCatalogPage({
+    int page = 1,
+    int limit = 20,
+  });
 
   Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId);
 

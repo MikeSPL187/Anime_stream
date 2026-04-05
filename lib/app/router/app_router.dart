@@ -1,22 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_shell.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/history/history_screen.dart';
 import '../../features/player/player_screen.dart';
+import '../../features/player/player_screen_context.dart';
+import '../../features/browse/browse_screen.dart';
+import '../../features/catalog/catalog_screen.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/series/series_screen.dart';
+import '../../features/watchlist/watchlist_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutePaths.home,
     routes: [
-      GoRoute(
-        path: AppRoutePaths.home,
-        builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: AppRoutePaths.search,
-        builder: (context, state) => const SearchScreen(),
+      ShellRoute(
+        builder: (context, state, child) {
+          return AppShell(location: state.uri.path, child: child);
+        },
+        routes: [
+          GoRoute(
+            path: AppRoutePaths.home,
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: AppRoutePaths.search,
+            builder: (context, state) => const SearchScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutePaths.series,
@@ -35,6 +48,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return PlayerScreen(sessionContext: sessionContext);
         },
       ),
+      GoRoute(
+        path: AppRoutePaths.watchlist,
+        builder: (context, state) => const WatchlistScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePaths.browse,
+        builder: (context, state) => const BrowseScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePaths.catalog,
+        builder: (context, state) => const CatalogScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePaths.history,
+        builder: (context, state) => const HistoryScreen(),
+      ),
     ],
   );
 });
@@ -44,6 +73,10 @@ abstract final class AppRoutePaths {
   static const search = '/search';
   static const series = '/series/:id';
   static const player = '/player';
+  static const watchlist = '/watchlist';
+  static const browse = '/browse';
+  static const catalog = '/catalog';
+  static const history = '/history';
 
   static String seriesDetails(String id) => '/series/$id';
 }
