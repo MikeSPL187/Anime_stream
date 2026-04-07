@@ -47,7 +47,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
 
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), _commitSearchFromDraft);
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      _commitSearchFromDraft,
+    );
   }
 
   void _commitSearchFromDraft() {
@@ -75,27 +78,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Search')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      body: Column(
         children: [
-          const _SearchLead(),
-          const SizedBox(height: 20),
-          _SearchFieldCard(
-            controller: _queryController,
-            hasText: _draftQuery.trim().isNotEmpty,
-            submittedQuery: submittedQuery,
-            onClear: _clearSearch,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: _SearchField(
+              controller: _queryController,
+              hasText: _draftQuery.trim().isNotEmpty,
+              onClear: _clearSearch,
+            ),
           ),
-          const SizedBox(height: 16),
-          _SearchStatusBanner(
-            draftQuery: _draftQuery,
-            submittedQuery: submittedQuery,
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.62,
+          Expanded(
             child: _SearchBody(
-              submittedQuery: submittedQuery,
+              draftQuery: _draftQuery,
               searchResults: searchResults,
             ),
           ),
@@ -105,244 +100,105 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _SearchLead extends StatelessWidget {
-  const _SearchLead();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Find anime'.toUpperCase(),
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text('Search by title', style: theme.textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        Text(
-          'Type a title and let search resolve into a real series result without the old form-only feel.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SearchFieldCard extends StatelessWidget {
-  const _SearchFieldCard({
+class _SearchField extends StatelessWidget {
+  const _SearchField({
     required this.controller,
     required this.hasText,
-    required this.submittedQuery,
     required this.onClear,
   });
 
   final TextEditingController controller;
   final bool hasText;
-  final String? submittedQuery;
   final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Live title intent', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(
-              submittedQuery == null
-                  ? 'Search activates once the title is long enough to run a real query.'
-                  : 'Search is actively matching "$submittedQuery".',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              autofocus: false,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'Search anime titles',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: !hasText
-                    ? null
-                    : IconButton(
-                        onPressed: onClear,
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Clear',
-                      ),
-              ),
-            ),
-          ],
-        ),
+    return TextField(
+      controller: controller,
+      autofocus: true,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: 'Search anime titles',
+        prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: hasText
+            ? IconButton(
+                onPressed: onClear,
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'Clear',
+              )
+            : null,
       ),
-    );
-  }
-}
-
-class _SearchStatusBanner extends StatelessWidget {
-  const _SearchStatusBanner({
-    required this.draftQuery,
-    required this.submittedQuery,
-  });
-
-  final String draftQuery;
-  final String? submittedQuery;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final normalized = normalizeSearchQuery(draftQuery);
-
-    if (normalized.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Text(
-            'Start typing a title to search the anime catalog.',
-            style: theme.textTheme.bodyMedium,
-          ),
-        ),
-      );
-    }
-
-    if (!canExecuteSearchQuery(normalized)) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Text(
-            'Keep typing. Search starts at $minimumSearchQueryLength characters.',
-            style: theme.textTheme.bodyMedium,
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _SearchChip(
-              label: 'Live search active',
-              color: theme.colorScheme.primary,
-            ),
-            _SearchChip(
-              label: submittedQuery ?? normalized,
-              color: theme.colorScheme.secondary,
-            ),
-          ],
-        ),
-      ),
+      style: theme.textTheme.bodyLarge,
     );
   }
 }
 
 class _SearchBody extends StatelessWidget {
-  const _SearchBody({
-    required this.submittedQuery,
-    required this.searchResults,
-  });
+  const _SearchBody({required this.draftQuery, required this.searchResults});
 
-  final String? submittedQuery;
+  final String draftQuery;
   final AsyncValue<List<Series>>? searchResults;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final normalizedDraft = normalizeSearchQuery(draftQuery);
 
-    if (submittedQuery == null) {
-      return Card(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.search_rounded, size: 40, color: theme.colorScheme.primary),
-                const SizedBox(height: 16),
-                Text('Search is waiting', style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                Text(
-                  'Type a title to move directly into a series page.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextButton.icon(
-                  onPressed: () => context.go(AppRoutePaths.browse),
-                  icon: const Icon(Icons.explore_outlined),
-                  label: const Text('Browse instead'),
-                ),
-              ],
-            ),
-          ),
-        ),
+    if (normalizedDraft.isEmpty) {
+      return const _SearchState(
+        icon: Icons.search_rounded,
+        title: 'Search by title',
+        message: 'Type a series title to move directly into a watch hub.',
+      );
+    }
+
+    if (!canExecuteSearchQuery(normalizedDraft)) {
+      return _SearchState(
+        icon: Icons.keyboard_rounded,
+        title: 'Keep typing',
+        message: 'Search starts at $minimumSearchQueryLength characters.',
       );
     }
 
     return searchResults!.when(
-      loading: () => const Card(
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (error, stackTrace) => Card(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Search failed.\n$error',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => _SearchState(
+        icon: Icons.error_outline_rounded,
+        title: 'Search unavailable',
+        message: 'The catalog could not be searched right now.\n$error',
       ),
       data: (seriesList) {
         if (seriesList.isEmpty) {
-          return Card(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'No anime matched "$submittedQuery".',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ),
+          return _SearchState(
+            icon: Icons.search_off_rounded,
+            title: 'No match found',
+            message: 'No anime matched "$normalizedDraft".',
+            action: TextButton.icon(
+              onPressed: () => context.go(AppRoutePaths.browse),
+              icon: const Icon(Icons.explore_outlined),
+              label: const Text('Browse instead'),
             ),
           );
         }
 
         final topMatch = seriesList.first;
-        final otherResults = seriesList.length <= 1
-            ? const <Series>[]
-            : seriesList.sublist(1);
+        final otherResults = seriesList.skip(1).toList(growable: false);
 
         return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            _TopMatchCard(series: topMatch),
+            _TopResultTile(series: topMatch),
             if (otherResults.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Text('More results', style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 20),
+              Text(
+                'More results',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 12),
-              for (var i = 0; i < otherResults.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
-                _SearchResultCard(series: otherResults[i]),
+              for (var index = 0; index < otherResults.length; index++) ...[
+                if (index > 0) const Divider(height: 24),
+                _SearchResultRow(series: otherResults[index]),
               ],
             ],
           ],
@@ -352,8 +208,8 @@ class _SearchBody extends StatelessWidget {
   }
 }
 
-class _TopMatchCard extends StatelessWidget {
-  const _TopMatchCard({required this.series});
+class _TopResultTile extends StatelessWidget {
+  const _TopResultTile({required this.series});
 
   final Series series;
 
@@ -365,24 +221,25 @@ class _TopMatchCard extends StatelessWidget {
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
     ].join('  •  ');
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SearchChip(
-              label: 'Top match',
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: 14),
-            Row(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: 116,
+                  width: 108,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     child: AspectRatio(
                       aspectRatio: 2 / 3,
                       child: _SearchArtwork(
@@ -397,105 +254,127 @@ class _TopMatchCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        'Top match',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Text(series.title, style: theme.textTheme.headlineSmall),
                       if (metadata.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(metadata, style: theme.textTheme.bodySmall),
+                        const SizedBox(height: 6),
+                        Text(
+                          metadata,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                       if ((series.synopsis ?? '').trim().isNotEmpty) ...[
                         const SizedBox(height: 10),
                         Text(
                           series.synopsis!,
-                          maxLines: 5,
+                          maxLines: 4,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: () => context.push(AppRoutePaths.seriesDetails(series.id)),
-                        icon: const Icon(Icons.arrow_forward_rounded),
-                        label: const Text('Open series'),
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        onPressed: () => context.push(
+                          AppRoutePaths.seriesDetails(series.id),
+                        ),
+                        child: const Text('Open Series'),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _SearchResultCard extends StatelessWidget {
-  const _SearchResultCard({required this.series});
+class _SearchResultRow extends StatelessWidget {
+  const _SearchResultRow({required this.series});
 
   final Series series;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final metadata = <String>[
+      if (series.releaseYear != null) '${series.releaseYear}',
+      if (series.genres.isNotEmpty) series.genres.first,
+    ].join(' • ');
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
         onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 84,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: AspectRatio(
-                      aspectRatio: 2 / 3,
-                      child: _SearchArtwork(
-                        imageUrl: series.posterImageUrl,
-                        label: series.title,
-                      ),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 82,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: 2 / 3,
+                    child: _SearchArtwork(
+                      imageUrl: series.posterImageUrl,
+                      label: series.title,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(series.title, style: theme.textTheme.titleMedium),
-                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                      if (metadata.isNotEmpty) ...[
+                        const SizedBox(height: 4),
                         Text(
-                          series.synopsis!,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
+                          metadata,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
-                      const SizedBox(height: 10),
-                      Text(
-                        'Open series',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
+                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          series.synopsis!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
         ),
       ),
@@ -503,34 +382,57 @@ class _SearchResultCard extends StatelessWidget {
   }
 }
 
-class _SearchChip extends StatelessWidget {
-  const _SearchChip({required this.label, required this.color});
+class _SearchState extends StatelessWidget {
+  const _SearchState({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.action,
+  });
 
-  final String label;
-  final Color color;
+  final IconData icon;
+  final String title;
+  final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 40, color: theme.colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (action != null) ...[const SizedBox(height: 16), action!],
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _SearchArtwork extends StatelessWidget {
-  const _SearchArtwork({
-    required this.imageUrl,
-    required this.label,
-  });
+  const _SearchArtwork({required this.imageUrl, required this.label});
 
   final String? imageUrl;
   final String label;
@@ -550,7 +452,10 @@ class _SearchArtwork extends StatelessWidget {
         trimmedUrl,
         fit: BoxFit.cover,
         loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
+          if (loadingProgress == null) {
+            return child;
+          }
+
           return Stack(
             fit: StackFit.expand,
             children: [
@@ -575,6 +480,7 @@ class _SearchArtworkFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -591,7 +497,10 @@ class _SearchArtworkFallback extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.movie_creation_outlined, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.movie_creation_outlined,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 8),
             Text(
               label,

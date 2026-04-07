@@ -55,11 +55,11 @@ class _HomeLaunchSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final featuredData = featuredSeries.asData?.value;
+    final featuredData = featuredSeries.asData?.value ?? const <Series>[];
     final browseData = browseCatalog.asData?.value;
+    final hasInitialContent = featuredData.isNotEmpty || browseData != null;
     final isInitialLoading =
-        featuredData == null &&
-        browseData == null &&
+        !hasInitialContent &&
         (featuredSeries.isLoading || browseCatalog.isLoading);
 
     if (isInitialLoading) {
@@ -68,26 +68,24 @@ class _HomeLaunchSurface extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        // Route-level pull to refresh intentionally stays read-side only.
+        // This phase intentionally keeps Home read-side only.
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           _ContinueWatchingSection(continueWatching: continueWatching),
           const SizedBox(height: 24),
-          if (featuredData != null && featuredData.isNotEmpty)
-            _FeaturedHeroSection(series: featuredData.first)
+          if (featuredData.isNotEmpty)
+            _FeaturedHero(series: featuredData.first)
           else
-            const _SurfaceCard(
-              child: _SectionEmptyMessage(
-                title: 'Featured discovery unavailable',
-                message:
-                    'Home is ready to spotlight a featured anime when the current feed returns one.',
-              ),
+            const _InlineEmptyState(
+              title: 'Featured anime unavailable',
+              message:
+                  'Home will spotlight a launch title when discovery resolves one.',
             ),
-          const SizedBox(height: 24),
-          _DiscoveryLaunchSection(
-            featuredSeries: featuredData ?? const <Series>[],
+          const SizedBox(height: 28),
+          _DiscoverySection(
+            featuredSeries: featuredData.skip(1).toList(growable: false),
             browseCatalog: browseCatalog,
           ),
         ],
@@ -103,52 +101,48 @@ class _ContinueWatchingSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SectionBlock(
-      title: 'Continue Watching',
-      description:
-          'Resume directly from active episodes without stepping through a series page first.',
-      trailing: _SectionCountPill(
-        label: continueWatching.isLoading
-            ? 'Loading'
-            : '${continueWatching.asData?.value.length ?? 0} ready',
+    return continueWatching.when(
+      loading: () => const _SectionLoadingState(title: 'Continue Watching'),
+      error: (error, stackTrace) => _SectionErrorState(
+        title: 'Continue Watching',
+        message: 'Saved watch progress could not be loaded.\n$error',
       ),
-      child: continueWatching.when(
-        loading: () => const _SurfaceCard(
-          child: SizedBox(
-            height: 180,
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        ),
-        error: (error, stackTrace) => _SurfaceCard(
-          child: _SectionEmptyMessage(
-            title: 'Continue Watching unavailable',
-            message: 'Saved watch progress could not be loaded.\n$error',
-          ),
-        ),
-        data: (entries) {
-          if (entries.isEmpty) {
-            return const _SurfaceCard(
-              child: _SectionEmptyMessage(
-                title: 'Nothing to resume yet',
-                message:
-                    'Start an episode from a series page and Home will bring it back here as a resume card.',
-              ),
-            );
-          }
-
-          return SizedBox(
-            height: 248,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: entries.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                return _ContinueWatchingCard(item: entries[index]);
-              },
-            ),
+      data: (entries) {
+        if (entries.isEmpty) {
+          return const _InlineEmptyState(
+            title: 'Nothing to resume',
+            message:
+                'Start an episode from a series page and Home will bring it back here.',
           );
-        },
-      ),
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionHeader(
+              title: 'Continue Watching',
+              trailing: Text(
+                '${entries.length} active',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 246,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: entries.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return _ContinueWatchingCard(item: entries[index]);
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -161,91 +155,105 @@ class _ContinueWatchingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final progressPercent = item.progressFraction == null
-        ? null
-        : '${(item.progressFraction! * 100).round()}%';
 
     return SizedBox(
-      width: 228,
+      width: 184,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(22),
           onTap: () => _openContinueWatchingEntry(context, item),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: _ArtworkImage(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _ArtworkImage(
                         imageUrl: item.seriesPosterImageUrl,
                         fallbackLabel: item.seriesTitle,
                         icon: Icons.movie_creation_outlined,
                         alignment: Alignment.topCenter,
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _LeadChip(
-                        label: item.episodeLabel,
-                        color: theme.colorScheme.secondary,
-                      ),
-                      if (progressPercent != null)
-                        _LeadChip(
-                          label: progressPercent,
-                          color: theme.colorScheme.primary,
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.04),
+                                Colors.black.withValues(alpha: 0.08),
+                                Colors.black.withValues(alpha: 0.82),
+                              ],
+                            ),
+                          ),
                         ),
+                      ),
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        bottom: 10,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.episodeLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.seriesTitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: item.progressFraction ?? 0,
+                                minHeight: 5,
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    item.seriesTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.episodeTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: item.progressFraction ?? 0,
-                      minHeight: 6,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    item.progressLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+              Text(
+                item.episodeTitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.progressLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -253,8 +261,8 @@ class _ContinueWatchingCard extends StatelessWidget {
   }
 }
 
-class _FeaturedHeroSection extends StatelessWidget {
-  const _FeaturedHeroSection({required this.series});
+class _FeaturedHero extends StatelessWidget {
+  const _FeaturedHero({required this.series});
 
   final Series series;
 
@@ -266,80 +274,121 @@ class _FeaturedHeroSection extends StatelessWidget {
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
     ].join('  •  ');
 
-    return _SectionBlock(
-      title: 'Featured Right Now',
-      description:
-          'A highlighted anime to launch straight from Home when you want a faster entry than full browsing.',
-      child: _SurfaceCard(
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _HeroArtwork(
-              imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
-              fallbackLabel: series.title,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (metadata.isNotEmpty) ...[
-                    _LeadChip(
-                      label: metadata,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Text(series.title, style: theme.textTheme.headlineSmall),
-                  if ((series.originalTitle ?? '').trim().isNotEmpty &&
-                      series.originalTitle != series.title) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      series.originalTitle!,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(title: 'Featured'),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            height: 330,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _ArtworkImage(
+                  imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
+                  fallbackLabel: series.title,
+                  icon: Icons.live_tv_rounded,
+                  alignment: Alignment.topCenter,
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.08),
+                          Colors.black.withValues(alpha: 0.18),
+                          Colors.black.withValues(alpha: 0.88),
+                        ],
                       ),
                     ),
-                  ],
-                  if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      series.synopsis!,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      FilledButton.icon(
-                        onPressed: () => _openSeriesDetails(context, series),
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Open Series'),
+                      if (metadata.isNotEmpty)
+                        Text(
+                          metadata,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.78),
+                          ),
+                        ),
+                      if (metadata.isNotEmpty) const SizedBox(height: 8),
+                      Text(
+                        series.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          height: 1.05,
+                        ),
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => context.go(AppRoutePaths.browse),
-                        icon: const Icon(Icons.explore_rounded),
-                        label: const Text('Browse More'),
+                      if ((series.originalTitle ?? '').trim().isNotEmpty &&
+                          series.originalTitle != series.title) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          series.originalTitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.82),
+                          ),
+                        ),
+                      ],
+                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          series.synopsis!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () =>
+                                _openSeriesDetails(context, series),
+                            icon: const Icon(Icons.play_arrow_rounded),
+                            label: const Text('Open Series'),
+                          ),
+                          TextButton(
+                            onPressed: () => context.go(AppRoutePaths.browse),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Browse More'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
-class _DiscoveryLaunchSection extends StatelessWidget {
-  const _DiscoveryLaunchSection({
+class _DiscoverySection extends StatelessWidget {
+  const _DiscoverySection({
     required this.featuredSeries,
     required this.browseCatalog,
   });
@@ -350,82 +399,64 @@ class _DiscoveryLaunchSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final browseData = browseCatalog.asData?.value;
-    final theme = Theme.of(context);
 
-    return _SectionBlock(
-      title: 'Explore from Home',
-      description:
-          'Home stays focused on launch and re-entry, but can still hand you into the real current discovery slices without inventing extra systems.',
-      trailing: TextButton.icon(
-        onPressed: () => context.go(AppRoutePaths.browse),
-        icon: const Icon(Icons.arrow_forward_rounded),
-        label: const Text('Open Browse'),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (browseCatalog.isLoading && browseData == null)
-            const _SurfaceCard(
-              child: SizedBox(
-                height: 160,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            )
-          else if (browseCatalog.hasError && browseData == null)
-            const _SurfaceCard(
-              child: _SectionEmptyMessage(
-                title: 'Discovery slices unavailable',
-                message:
-                    'Browse data could not be loaded right now. Open Browse later to retry.',
-              ),
-            )
-          else ...[
-            if (browseData != null && browseData.latestReleases.isNotEmpty) ...[
-              _PosterRailSection(
-                title: 'Latest Releases',
-                subtitle:
-                    'Fresh titles surfaced from the current repository-backed latest slice.',
-                seriesList: browseData.latestReleases,
-              ),
-              const SizedBox(height: 20),
-            ],
-            if (browseData != null && browseData.trendingSeries.isNotEmpty) ...[
-              _PosterRailSection(
-                title: 'Trending Ongoing',
-                subtitle:
-                    'Current ongoing anime ordered by fresh release activity.',
-                seriesList: browseData.trendingSeries,
-              ),
-              const SizedBox(height: 20),
-            ],
-            if (browseData != null && browseData.popularSeries.isNotEmpty) ...[
-              _PosterRailSection(
-                title: 'Popular Catalog',
-                subtitle:
-                    'Higher-confidence catalog picks when you want broader discovery.',
-                seriesList: browseData.popularSeries,
-              ),
-              const SizedBox(height: 20),
-            ],
-            if (featuredSeries.length > 1) ...[
-              _PosterRailSection(
-                title: 'More Featured Picks',
-                subtitle:
-                    'Additional featured anime surfaced directly on the Home launch screen.',
-                seriesList: featuredSeries.skip(1).toList(growable: false),
-              ),
-            ],
-            if ((browseData == null || !browseData.hasAnyContent) &&
-                featuredSeries.length <= 1)
-              _SurfaceCard(
-                child: Text(
-                  'Browse is connected, but there are no extra discovery rails to show yet.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ),
-          ],
+    if (browseCatalog.isLoading && browseData == null) {
+      return const _SectionLoadingState(title: 'Discover');
+    }
+
+    if (browseCatalog.hasError && browseData == null) {
+      return const _SectionErrorState(
+        title: 'Discover',
+        message: 'Browse slices could not be loaded right now.',
+      );
+    }
+
+    final sections = <Widget>[];
+    if (browseData != null && browseData.latestReleases.isNotEmpty) {
+      sections.add(
+        _PosterRailSection(
+          title: 'Latest Releases',
+          seriesList: browseData.latestReleases,
+          trailingLabel: 'Browse',
+        ),
+      );
+    }
+    if (browseData != null && browseData.trendingSeries.isNotEmpty) {
+      sections.add(
+        _PosterRailSection(
+          title: 'Trending Ongoing',
+          seriesList: browseData.trendingSeries,
+        ),
+      );
+    }
+    if (browseData != null && browseData.popularSeries.isNotEmpty) {
+      sections.add(
+        _PosterRailSection(
+          title: 'Popular Catalog',
+          seriesList: browseData.popularSeries,
+        ),
+      );
+    }
+    if (featuredSeries.isNotEmpty) {
+      sections.add(
+        _PosterRailSection(title: 'More to Start', seriesList: featuredSeries),
+      );
+    }
+
+    if (sections.isEmpty) {
+      return const _InlineEmptyState(
+        title: 'Discovery is quiet',
+        message: 'There are no additional rails to show right now.',
+      );
+    }
+
+    return Column(
+      children: [
+        for (var index = 0; index < sections.length; index++) ...[
+          if (index > 0) const SizedBox(height: 28),
+          sections[index],
         ],
-      ),
+      ],
     );
   }
 }
@@ -433,32 +464,31 @@ class _DiscoveryLaunchSection extends StatelessWidget {
 class _PosterRailSection extends StatelessWidget {
   const _PosterRailSection({
     required this.title,
-    required this.subtitle,
     required this.seriesList,
+    this.trailingLabel,
   });
 
   final String title;
-  final String subtitle;
   final List<Series> seriesList;
+  final String? trailingLabel;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+        _SectionHeader(
+          title: title,
+          trailing: trailingLabel == null
+              ? null
+              : TextButton(
+                  onPressed: () => context.go(AppRoutePaths.browse),
+                  child: Text(trailingLabel!),
+                ),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 250,
+          height: 244,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: seriesList.length,
@@ -487,63 +517,48 @@ class _PosterRailCard extends StatelessWidget {
     ].join('  •  ');
 
     return SizedBox(
-      width: 168,
+      width: 152,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
           onTap: () => _openSeriesDetails(context, series),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: AspectRatio(
-                      aspectRatio: 2 / 3,
-                      child: _ArtworkImage(
-                        imageUrl: series.posterImageUrl,
-                        fallbackLabel: series.title,
-                        icon: Icons.movie_creation_outlined,
-                        alignment: Alignment.topCenter,
-                      ),
+          borderRadius: BorderRadius.circular(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: AspectRatio(
+                    aspectRatio: 2 / 3,
+                    child: _ArtworkImage(
+                      imageUrl: series.posterImageUrl,
+                      fallbackLabel: series.title,
+                      icon: Icons.movie_creation_outlined,
+                      alignment: Alignment.topCenter,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    series.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  if (metadata.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      metadata,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
-                  Text(
-                    'Open series',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+              Text(
+                series.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium,
+              ),
+              if (metadata.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  metadata,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -551,145 +566,95 @@ class _PosterRailCard extends StatelessWidget {
   }
 }
 
-class _SectionBlock extends StatelessWidget {
-  const _SectionBlock({
-    required this.title,
-    required this.description,
-    required this.child,
-    this.trailing,
-  });
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.trailing});
 
   final String title;
-  final String description;
-  final Widget child;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleLarge),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (trailing != null) ...[const SizedBox(width: 12), trailing!],
-          ],
-        ),
-        const SizedBox(height: 12),
-        child,
+        Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+        trailing ?? const SizedBox.shrink(),
       ],
     );
   }
 }
 
-class _SectionCountPill extends StatelessWidget {
-  const _SectionCountPill({required this.label});
+class _SectionLoadingState extends StatelessWidget {
+  const _SectionLoadingState({required this.title});
 
-  final String label;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
-    return _LeadChip(
-      label: label,
-      color: Theme.of(context).colorScheme.primary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title: title),
+        const SizedBox(height: 12),
+        const SizedBox(
+          height: 180,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ],
     );
   }
 }
 
-class _LeadChip extends StatelessWidget {
-  const _LeadChip({required this.label, required this.color});
+class _SectionErrorState extends StatelessWidget {
+  const _SectionErrorState({required this.title, required this.message});
 
-  final String label;
-  final Color color;
+  final String title;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title: title),
+        const SizedBox(height: 12),
+        _InlineEmptyState(title: 'Unavailable', message: message),
+      ],
     );
   }
 }
 
-class _SurfaceCard extends StatelessWidget {
-  const _SurfaceCard({
-    required this.child,
-    this.padding = const EdgeInsets.all(16),
-  });
+class _InlineEmptyState extends StatelessWidget {
+  const _InlineEmptyState({required this.title, required this.message});
 
-  final Widget child;
-  final EdgeInsetsGeometry padding;
+  final String title;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: padding,
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(24),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: child,
-    );
-  }
-}
-
-class _HeroArtwork extends StatelessWidget {
-  const _HeroArtwork({required this.imageUrl, required this.fallbackLabel});
-
-  final String? imageUrl;
-  final String fallbackLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 260,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _ArtworkImage(
-            imageUrl: imageUrl,
-            fallbackLabel: fallbackLabel,
-            icon: Icons.live_tv_rounded,
-            alignment: Alignment.topCenter,
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0x11000000), Color(0xAA000000)],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -784,32 +749,6 @@ class _ArtworkFallback extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _SectionEmptyMessage extends StatelessWidget {
-  const _SectionEmptyMessage({required this.title, required this.message});
-
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        Text(
-          message,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 }
