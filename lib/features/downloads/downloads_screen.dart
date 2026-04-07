@@ -67,6 +67,7 @@ class DownloadsScreen extends ConsumerWidget {
           final failed = entries
               .where((e) => e.status == DownloadStatus.failed)
               .toList(growable: false);
+          final integrityFailures = failed.where(_isIntegrityFailure).length;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -76,6 +77,7 @@ class DownloadsScreen extends ConsumerWidget {
                 offlineCount: offlineReady.length,
                 activeCount: active.length,
                 failedCount: failed.length,
+                integrityFailureCount: integrityFailures,
               ),
               const SizedBox(height: 20),
               if (offlineReady.isNotEmpty) ...[
@@ -97,7 +99,9 @@ class DownloadsScreen extends ConsumerWidget {
               if (failed.isNotEmpty)
                 _DownloadsSection(
                   title: 'Needs attention',
-                  subtitle: 'Retry or remove failed offline entries.',
+                  subtitle: integrityFailures > 0
+                      ? 'Retry failed transfers or restore missing offline copies.'
+                      : 'Retry or remove failed offline entries.',
                   entries: failed,
                 ),
             ],
@@ -114,12 +118,14 @@ class _SummaryStrip extends StatelessWidget {
     required this.offlineCount,
     required this.activeCount,
     required this.failedCount,
+    required this.integrityFailureCount,
   });
 
   final int totalCount;
   final int offlineCount;
   final int activeCount;
   final int failedCount;
+  final int integrityFailureCount;
 
   @override
   Widget build(BuildContext context) {
@@ -133,6 +139,11 @@ class _SummaryStrip extends StatelessWidget {
         _Badge(label: '$activeCount active', color: colorScheme.tertiary),
         if (failedCount > 0)
           _Badge(label: '$failedCount failed', color: colorScheme.error),
+        if (integrityFailureCount > 0)
+          _Badge(
+            label: '$integrityFailureCount need restore',
+            color: colorScheme.error,
+          ),
       ],
     );
   }
@@ -328,6 +339,12 @@ class _DownloadRowScaffold extends ConsumerWidget {
       await controller.startDownload(selectedQuality: entry.selectedQuality);
     }
 
+    final integrityFailure = _isIntegrityFailure(entry);
+    final primaryRecoveryLabel = integrityFailure ? 'Download again' : 'Retry';
+    final primaryRecoveryIcon = integrityFailure
+        ? Icons.download_rounded
+        : Icons.refresh_rounded;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -359,7 +376,7 @@ class _DownloadRowScaffold extends ConsumerWidget {
               if ((entry.lastError ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text(
-                  entry.lastError!,
+                  _friendlyDownloadError(entry),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -382,8 +399,8 @@ class _DownloadRowScaffold extends ConsumerWidget {
                       entry.status == DownloadStatus.paused)
                     FilledButton.tonalIcon(
                       onPressed: isBusy ? null : () => handleRetry(),
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
+                      icon: Icon(primaryRecoveryIcon),
+                      label: Text(primaryRecoveryLabel),
                     ),
                   TextButton(
                     onPressed: isBusy ? null : onOpenSeries,
@@ -584,6 +601,31 @@ class _Badge extends StatelessWidget {
   }
 }
 
+bool _isIntegrityFailure(DownloadEntry entry) {
+  if (entry.status != DownloadStatus.failed) {
+    return false;
+  }
+
+  final error = (entry.lastError ?? '').trim().toLowerCase();
+  return error.startsWith('offline asset') ||
+      error.startsWith('offline package directory');
+}
+
+String _friendlyDownloadError(DownloadEntry entry) {
+  if (!_isIntegrityFailure(entry)) {
+    return entry.lastError ?? '';
+  }
+
+  final error = (entry.lastError ?? '').trim().toLowerCase();
+  if (error.contains('missing on device')) {
+    return 'Offline copy is missing on this device. Download it again to restore playback.';
+  }
+  if (error.contains('empty') || error.contains('invalid')) {
+    return 'Offline package is damaged and needs to be downloaded again.';
+  }
+  return 'Offline copy needs to be restored before it can play again.';
+}
+
 String _downloadStatusLabel(DownloadEntry entry) {
   return switch (entry.status) {
     DownloadStatus.completed when entry.isPlayableOffline =>
@@ -592,6 +634,8 @@ String _downloadStatusLabel(DownloadEntry entry) {
     DownloadStatus.downloading => 'Downloading',
     DownloadStatus.queued => 'Queued',
     DownloadStatus.paused => 'Paused',
+    DownloadStatus.failed when _isIntegrityFailure(entry) =>
+      'Unavailable offline',
     DownloadStatus.failed => 'Failed',
   };
 }
