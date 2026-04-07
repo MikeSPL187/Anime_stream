@@ -34,15 +34,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Catalog')),
       body: catalogPage.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Catalog page could not be loaded.\n$error',
-              textAlign: TextAlign.center,
-            ),
-          ),
+        loading: () => const _CenteredState(
+          icon: Icons.grid_view_rounded,
+          title: 'Loading catalog',
+          message: 'A deeper page of titles is being loaded.',
+        ),
+        error: (error, stackTrace) => _CenteredState(
+          icon: Icons.error_outline_rounded,
+          title: 'Catalog unavailable',
+          message: 'Catalog page could not be loaded.\n$error',
         ),
         data: (page) => _CatalogPageView(
           page: page,
@@ -71,109 +71,104 @@ class _CatalogPageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    if (page.items.isEmpty) {
+      return _CenteredState(
+        icon: Icons.grid_off_rounded,
+        title: 'No titles on this page',
+        message: 'Catalog page ${page.page} has no titles to show right now.',
+      );
+    }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Catalog Listing', style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                Text(
-                  'Browse deeper than the current featured slices through a plain paged catalog listing.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _CatalogMetaChip(label: 'Page ${page.page}'),
-                    _CatalogMetaChip(label: '${page.totalItems} total titles'),
-                    _CatalogMetaChip(label: '${page.pageSize} per page'),
-                  ],
-                ),
+        _SummaryStrip(page: page),
+        const SizedBox(height: 20),
+        _SurfaceBlock(
+          child: Column(
+            children: [
+              for (var index = 0; index < page.items.length; index++) ...[
+                if (index > 0) const Divider(height: 20),
+                _CatalogSeriesRow(series: page.items[index]),
               ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _PaginationBar(
+          page: page,
+          onOpenPreviousPage: onOpenPreviousPage,
+          onOpenNextPage: onOpenNextPage,
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryStrip extends StatelessWidget {
+  const _SummaryStrip({required this.page});
+
+  final SeriesCatalogPage page;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _CountBadge(label: 'Page ${page.page}', color: colorScheme.primary),
+        _CountBadge(
+          label: '${page.totalItems} total',
+          color: colorScheme.secondary,
+        ),
+        _CountBadge(
+          label: '${page.pageSize} per page',
+          color: colorScheme.tertiary,
+        ),
+      ],
+    );
+  }
+}
+
+class _PaginationBar extends StatelessWidget {
+  const _PaginationBar({
+    required this.page,
+    required this.onOpenPreviousPage,
+    required this.onOpenNextPage,
+  });
+
+  final SeriesCatalogPage page;
+  final VoidCallback? onOpenPreviousPage;
+  final VoidCallback? onOpenNextPage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        OutlinedButton.icon(
+          onPressed: onOpenPreviousPage,
+          icon: const Icon(Icons.chevron_left_rounded),
+          label: const Text('Previous'),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'Page ${page.page} of ${page.totalPages}',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('All Catalog', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(
-                  'A plain release listing without extra semantic grouping.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (page.items.isEmpty)
-                  Text(
-                    'No titles are available on this catalog page.',
-                    style: theme.textTheme.bodyMedium,
-                  )
-                else
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: page.items.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      return _CatalogSeriesRow(series: page.items[index]);
-                    },
-                  ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: onOpenPreviousPage,
-                      icon: const Icon(Icons.chevron_left_rounded),
-                      label: const Text('Previous'),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Page ${page.page} of ${page.totalPages}',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      onPressed: onOpenNextPage,
-                      icon: const Icon(Icons.chevron_right_rounded),
-                      label: const Text('Next'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          onPressed: onOpenNextPage,
+          icon: const Icon(Icons.chevron_right_rounded),
+          label: const Text('Next'),
         ),
       ],
     );
@@ -191,24 +186,21 @@ class _CatalogSeriesRow extends StatelessWidget {
     final metadata = <String>[
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
-    ].join('  •  ');
+    ].join(' • ');
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _CatalogPoster(
-                imageUrl: series.posterImageUrl,
-                label: series.title,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Poster(imageUrl: series.posterImageUrl, label: series.title),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -218,7 +210,9 @@ class _CatalogSeriesRow extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         series.originalTitle!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -227,34 +221,77 @@ class _CatalogSeriesRow extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         metadata,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                     if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         series.synopsis!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    Text(
-                      'Open series',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CenteredState extends StatelessWidget {
+  const _CenteredState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 40, color: theme.colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -264,14 +301,15 @@ class _CatalogSeriesRow extends StatelessWidget {
   }
 }
 
-class _CatalogPoster extends StatelessWidget {
-  const _CatalogPoster({required this.imageUrl, required this.label});
+class _Poster extends StatelessWidget {
+  const _Poster({required this.imageUrl, required this.label});
 
   final String? imageUrl;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final trimmedUrl = imageUrl?.trim();
 
     return ClipRRect(
@@ -281,28 +319,33 @@ class _CatalogPoster extends StatelessWidget {
         child: AspectRatio(
           aspectRatio: 2 / 3,
           child: trimmedUrl == null || trimmedUrl.isEmpty
-              ? _CatalogPosterFallback(label: label)
-              : Image.network(
-                  trimmedUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) {
-                      return child;
-                    }
+              ? _PosterFallback(label: label)
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHigh,
+                  ),
+                  child: Image.network(
+                    trimmedUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) {
+                        return child;
+                      }
 
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        _CatalogPosterFallback(label: label),
-                        const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ],
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return _CatalogPosterFallback(label: label);
-                  },
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _PosterFallback(label: label),
+                          const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ],
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return _PosterFallback(label: label);
+                    },
+                  ),
                 ),
         ),
       ),
@@ -310,8 +353,8 @@ class _CatalogPoster extends StatelessWidget {
   }
 }
 
-class _CatalogPosterFallback extends StatelessWidget {
-  const _CatalogPosterFallback({required this.label});
+class _PosterFallback extends StatelessWidget {
+  const _PosterFallback({required this.label});
 
   final String label;
 
@@ -356,29 +399,43 @@ class _CatalogPosterFallback extends StatelessWidget {
   }
 }
 
-class _CatalogMetaChip extends StatelessWidget {
-  const _CatalogMetaChip({required this.label});
+class _SurfaceBlock extends StatelessWidget {
+  const _SurfaceBlock({required this.child});
 
-  final String label;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.24),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Text(
         label,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.primary,
-        ),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
       ),
     );
   }
