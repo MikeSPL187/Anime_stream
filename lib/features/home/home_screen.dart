@@ -74,7 +74,7 @@ class _HomeLaunchSurface extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           _ContinueWatchingSection(continueWatching: continueWatching),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           if (featuredData.isNotEmpty)
             _FeaturedHero(series: featuredData.first)
           else
@@ -83,7 +83,7 @@ class _HomeLaunchSurface extends StatelessWidget {
               message:
                   'Home will spotlight a launch title when discovery resolves one.',
             ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _DiscoverySection(
             featuredSeries: featuredData.skip(1).toList(growable: false),
             browseCatalog: browseCatalog,
@@ -128,9 +128,9 @@ class _ContinueWatchingSection extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             SizedBox(
-              height: 246,
+              height: 228,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: entries.length,
@@ -157,7 +157,7 @@ class _ContinueWatchingCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SizedBox(
-      width: 184,
+      width: 168,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -216,7 +216,7 @@ class _ContinueWatchingCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: Colors.white,
-                                height: 1.15,
+                                height: 1.1,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -237,14 +237,14 @@ class _ContinueWatchingCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 item.episodeTitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodySmall,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 item.progressLabel,
                 maxLines: 1,
@@ -272,17 +272,17 @@ class _FeaturedHero extends StatelessWidget {
     final metadata = <String>[
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
-    ].join('  •  ');
+    ].join(' • ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionHeader(title: 'Featured'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: SizedBox(
-            height: 330,
+            height: 286,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -317,11 +317,13 @@ class _FeaturedHero extends StatelessWidget {
                       if (metadata.isNotEmpty)
                         Text(
                           metadata,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white.withValues(alpha: 0.78),
                           ),
                         ),
-                      if (metadata.isNotEmpty) const SizedBox(height: 8),
+                      if (metadata.isNotEmpty) const SizedBox(height: 6),
                       Text(
                         series.title,
                         maxLines: 2,
@@ -333,29 +335,29 @@ class _FeaturedHero extends StatelessWidget {
                       ),
                       if ((series.originalTitle ?? '').trim().isNotEmpty &&
                           series.originalTitle != series.title) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           series.originalTitle!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white.withValues(alpha: 0.82),
                           ),
                         ),
                       ],
                       if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         Text(
                           series.synopsis!,
-                          maxLines: 3,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white.withValues(alpha: 0.9),
                             height: 1.25,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -453,7 +455,7 @@ class _DiscoverySection extends StatelessWidget {
     return Column(
       children: [
         for (var index = 0; index < sections.length; index++) ...[
-          if (index > 0) const SizedBox(height: 28),
+          if (index > 0) const SizedBox(height: 24),
           sections[index],
         ],
       ],
@@ -486,9 +488,9 @@ class _PosterRailSection extends StatelessWidget {
                   child: Text(trailingLabel!),
                 ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         SizedBox(
-          height: 244,
+          height: 228,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: seriesList.length,
@@ -514,10 +516,10 @@ class _PosterRailCard extends StatelessWidget {
     final metadata = <String>[
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.first,
-    ].join('  •  ');
+    ].join(' • ');
 
     return SizedBox(
-      width: 152,
+      width: 144,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -540,15 +542,15 @@ class _PosterRailCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 series.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium,
+                style: theme.textTheme.titleSmall,
               ),
               if (metadata.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   metadata,
                   maxLines: 1,
@@ -596,9 +598,9 @@ class _SectionLoadingState extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(title: title),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         const SizedBox(
-          height: 180,
+          height: 168,
           child: Center(child: CircularProgressIndicator()),
         ),
       ],
@@ -618,7 +620,7 @@ class _SectionErrorState extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(title: title),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         _InlineEmptyState(title: 'Unavailable', message: message),
       ],
     );
