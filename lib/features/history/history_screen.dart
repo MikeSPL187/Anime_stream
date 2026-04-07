@@ -16,141 +16,72 @@ class HistoryScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('History')),
       body: history.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Watch history could not be loaded.\n$error',
-              textAlign: TextAlign.center,
-            ),
-          ),
+        loading: () => const _CenteredState(
+          icon: Icons.history_rounded,
+          title: 'Loading history',
+          message: 'Completed episodes are being loaded.',
         ),
-        data: (entries) => _HistoryView(entries: entries),
+        error: (error, stackTrace) => _CenteredState(
+          icon: Icons.error_outline_rounded,
+          title: 'History unavailable',
+          message: 'Watch history could not be loaded.\n$error',
+        ),
+        data: (entries) => _HistoryBody(entries: entries),
       ),
     );
   }
 }
 
-class _HistoryView extends StatelessWidget {
-  const _HistoryView({required this.entries});
+class _HistoryBody extends StatelessWidget {
+  const _HistoryBody({required this.entries});
 
   final List<HistoryEntry> entries;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    if (entries.isEmpty) {
+      return const _CenteredState(
+        icon: Icons.history_toggle_off_rounded,
+        title: 'No watch history yet',
+        message: 'Completed episodes will appear here after you finish them.',
+      );
+    }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        _HistoryIntroCard(count: entries.length),
-        const SizedBox(height: 16),
-        if (entries.isEmpty)
-          const _HistoryEmptyState()
-        else
-          _HistorySurfaceCard(
-            child: Column(
-              children: [
-                for (var index = 0; index < entries.length; index++) ...[
-                  if (index > 0) const Divider(height: 1),
-                  _HistoryRow(entry: entries[index]),
-                ],
+        _SummaryStrip(count: entries.length),
+        const SizedBox(height: 20),
+        _SurfaceBlock(
+          child: Column(
+            children: [
+              for (var index = 0; index < entries.length; index++) ...[
+                if (index > 0) const Divider(height: 20),
+                _HistoryRow(entry: entries[index]),
               ],
-            ),
+            ],
           ),
-        if (entries.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            'History reflects completed viewing activity. Continue Watching remains the place for unfinished episodes.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+        ),
       ],
     );
   }
 }
 
-class _HistoryIntroCard extends StatelessWidget {
-  const _HistoryIntroCard({required this.count});
+class _SummaryStrip extends StatelessWidget {
+  const _SummaryStrip({required this.count});
 
   final int count;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return _HistorySurfaceCard(
-      backgroundColor: theme.colorScheme.tertiaryContainer.withValues(
-        alpha: 0.2,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.tertiary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.history_rounded,
-              color: theme.colorScheme.tertiary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Previously Watched', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(
-                  'Look back at completed episode activity without mixing it into saved-for-later or active resume flows.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _HistoryBadge(label: '$count watched'),
-        ],
-      ),
-    );
-  }
-}
-
-class _HistoryEmptyState extends StatelessWidget {
-  const _HistoryEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return _HistorySurfaceCard(
-      child: Column(
-        children: [
-          Icon(
-            Icons.history_toggle_off_rounded,
-            size: 36,
-            color: theme.colorScheme.tertiary,
-          ),
-          const SizedBox(height: 12),
-          Text('No Watch History Yet', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(
-            'Completed episodes will appear here after you finish them. This surface only tracks retrospective viewing activity.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _CountBadge(label: '$count watched', color: colorScheme.tertiary),
+      ],
     );
   }
 }
@@ -163,83 +94,65 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final episodeTitle = _resolvedEpisodeTitle(entry);
     final metadata = <String>[
+      'Episode ${entry.episode.numberLabel}',
       if (entry.series.releaseYear != null) '${entry.series.releaseYear}',
       if (entry.series.genres.isNotEmpty) entry.series.genres.first,
-    ].join('  •  ');
+      'Watched ${_formatWatchedAt(entry.watchedAt)}',
+    ].join(' • ');
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _HistoryPoster(
-                imageUrl: entry.series.posterImageUrl,
-                fallbackLabel: entry.series.title,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Poster(
+              imageUrl: entry.series.posterImageUrl,
+              fallbackLabel: entry.series.title,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _HistoryBadge(label: 'Completed'),
-                    const SizedBox(height: 10),
                     Text(
                       entry.series.title,
                       style: theme.textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _resolvedEpisodeTitle(entry),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Episode ${entry.episode.numberLabel}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.tertiary,
-                      ),
-                    ),
                     const SizedBox(height: 4),
                     Text(
-                      'Watched ${_formatWatchedAt(entry.watchedAt)}',
+                      episodeTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (metadata.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        metadata,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     Text(
-                      'Open series',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.primary,
+                      metadata,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );
@@ -255,8 +168,54 @@ class _HistoryRow extends StatelessWidget {
   }
 }
 
-class _HistoryPoster extends StatelessWidget {
-  const _HistoryPoster({required this.imageUrl, required this.fallbackLabel});
+class _CenteredState extends StatelessWidget {
+  const _CenteredState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 40, color: theme.colorScheme.tertiary),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Poster extends StatelessWidget {
+  const _Poster({required this.imageUrl, required this.fallbackLabel});
 
   final String? imageUrl;
   final String fallbackLabel;
@@ -273,7 +232,7 @@ class _HistoryPoster extends StatelessWidget {
         child: AspectRatio(
           aspectRatio: 2 / 3,
           child: trimmedUrl == null || trimmedUrl.isEmpty
-              ? _HistoryPosterFallback(fallbackLabel: fallbackLabel)
+              ? _PosterFallback(fallbackLabel: fallbackLabel)
               : DecoratedBox(
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHigh,
@@ -289,7 +248,7 @@ class _HistoryPoster extends StatelessWidget {
                       return Stack(
                         fit: StackFit.expand,
                         children: [
-                          _HistoryPosterFallback(fallbackLabel: fallbackLabel),
+                          _PosterFallback(fallbackLabel: fallbackLabel),
                           const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
@@ -297,9 +256,7 @@ class _HistoryPoster extends StatelessWidget {
                       );
                     },
                     errorBuilder: (context, error, stackTrace) {
-                      return _HistoryPosterFallback(
-                        fallbackLabel: fallbackLabel,
-                      );
+                      return _PosterFallback(fallbackLabel: fallbackLabel);
                     },
                   ),
                 ),
@@ -309,8 +266,8 @@ class _HistoryPoster extends StatelessWidget {
   }
 }
 
-class _HistoryPosterFallback extends StatelessWidget {
-  const _HistoryPosterFallback({required this.fallbackLabel});
+class _PosterFallback extends StatelessWidget {
+  const _PosterFallback({required this.fallbackLabel});
 
   final String fallbackLabel;
 
@@ -355,48 +312,43 @@ class _HistoryPosterFallback extends StatelessWidget {
   }
 }
 
-class _HistorySurfaceCard extends StatelessWidget {
-  const _HistorySurfaceCard({required this.child, this.backgroundColor});
+class _SurfaceBlock extends StatelessWidget {
+  const _SurfaceBlock({required this.child});
 
   final Widget child;
-  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: backgroundColor,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: child,
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
 }
 
-class _HistoryBadge extends StatelessWidget {
-  const _HistoryBadge({required this.label});
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.label, required this.color});
 
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Text(
         label,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.onTertiaryContainer,
-        ),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
       ),
     );
   }

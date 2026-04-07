@@ -16,141 +16,72 @@ class WatchlistScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Watchlist')),
       body: watchlist.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Saved titles could not be loaded.\n$error',
-              textAlign: TextAlign.center,
-            ),
-          ),
+        loading: () => const _CenteredState(
+          icon: Icons.bookmark_rounded,
+          title: 'Loading Watchlist',
+          message: 'Saved titles are being loaded.',
         ),
-        data: (entries) => _WatchlistView(entries: entries),
+        error: (error, stackTrace) => _CenteredState(
+          icon: Icons.error_outline_rounded,
+          title: 'Watchlist unavailable',
+          message: 'Saved titles could not be loaded.\n$error',
+        ),
+        data: (entries) => _WatchlistBody(entries: entries),
       ),
     );
   }
 }
 
-class _WatchlistView extends StatelessWidget {
-  const _WatchlistView({required this.entries});
+class _WatchlistBody extends StatelessWidget {
+  const _WatchlistBody({required this.entries});
 
   final List<WatchlistEntry> entries;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    if (entries.isEmpty) {
+      return const _CenteredState(
+        icon: Icons.bookmark_add_outlined,
+        title: 'No saved titles yet',
+        message: 'Save a series from its page to keep it here for later.',
+      );
+    }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        _WatchlistIntroCard(count: entries.length),
-        const SizedBox(height: 16),
-        if (entries.isEmpty)
-          const _WatchlistEmptyState()
-        else
-          _WatchlistSurfaceCard(
-            child: Column(
-              children: [
-                for (var index = 0; index < entries.length; index++) ...[
-                  if (index > 0) const Divider(height: 1),
-                  _WatchlistRow(entry: entries[index]),
-                ],
+        _SummaryStrip(count: entries.length),
+        const SizedBox(height: 20),
+        _SurfaceBlock(
+          child: Column(
+            children: [
+              for (var index = 0; index < entries.length; index++) ...[
+                if (index > 0) const Divider(height: 20),
+                _WatchlistRow(entry: entries[index]),
               ],
-            ),
+            ],
           ),
-        if (entries.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            'Watchlist is for saved-for-later intent. Continue Watching remains the place for in-progress episodes.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+        ),
       ],
     );
   }
 }
 
-class _WatchlistIntroCard extends StatelessWidget {
-  const _WatchlistIntroCard({required this.count});
+class _SummaryStrip extends StatelessWidget {
+  const _SummaryStrip({required this.count});
 
   final int count;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return _WatchlistSurfaceCard(
-      backgroundColor: theme.colorScheme.primaryContainer.withValues(
-        alpha: 0.16,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.bookmark_rounded,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Saved for Later', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(
-                  'Keep titles here when you want to return later, even before starting playback.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _WatchlistCountBadge(label: '$count saved'),
-        ],
-      ),
-    );
-  }
-}
-
-class _WatchlistEmptyState extends StatelessWidget {
-  const _WatchlistEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return _WatchlistSurfaceCard(
-      child: Column(
-        children: [
-          Icon(
-            Icons.bookmark_add_outlined,
-            size: 36,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          Text('No Saved Titles Yet', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(
-            'Save a series from its page to keep it here for later. This is separate from Continue Watching.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _CountBadge(label: '$count saved', color: colorScheme.primary),
+      ],
     );
   }
 }
@@ -169,88 +100,126 @@ class _WatchlistRow extends ConsumerWidget {
     final metadata = <String>[
       if (entry.series.releaseYear != null) '${entry.series.releaseYear}',
       if (entry.series.genres.isNotEmpty) entry.series.genres.first,
-    ].join('  •  ');
+      'Saved ${_formatSavedDate(entry.addedAt)}',
+    ].join(' • ');
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _WatchlistPoster(
-                imageUrl: entry.series.posterImageUrl,
-                fallbackLabel: entry.series.title,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Poster(
+              imageUrl: entry.series.posterImageUrl,
+              fallbackLabel: entry.series.title,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _WatchlistCountBadge(label: 'Saved for later'),
-                    const SizedBox(height: 10),
                     Text(
                       entry.series.title,
                       style: theme.textTheme.titleMedium,
                     ),
                     if ((entry.series.originalTitle ?? '').trim().isNotEmpty &&
                         entry.series.originalTitle != entry.series.title) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        entry.series.originalTitle!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(
-                      'Saved ${_formatSavedDate(entry.addedAt)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (metadata.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        metadata,
+                        entry.series.originalTitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    Text(
-                      'Opens the series page.',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.primary,
+                    if (metadata.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        metadata,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: membership.isLoading
-                    ? null
-                    : () => ref
-                          .read(
-                            watchlistMembershipControllerProvider(
-                              entry.series.id,
-                            ).notifier,
-                          )
-                          .removeFromWatchlist(),
-                tooltip: 'Remove from watchlist',
-                icon: membership.isLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.bookmark_remove_outlined),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: membership.isLoading
+                  ? null
+                  : () => ref
+                        .read(
+                          watchlistMembershipControllerProvider(
+                            entry.series.id,
+                          ).notifier,
+                        )
+                        .removeFromWatchlist(),
+              tooltip: 'Remove from watchlist',
+              icon: membership.isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      Icons.bookmark_remove_outlined,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CenteredState extends StatelessWidget {
+  const _CenteredState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 40, color: theme.colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -260,8 +229,8 @@ class _WatchlistRow extends ConsumerWidget {
   }
 }
 
-class _WatchlistPoster extends StatelessWidget {
-  const _WatchlistPoster({required this.imageUrl, required this.fallbackLabel});
+class _Poster extends StatelessWidget {
+  const _Poster({required this.imageUrl, required this.fallbackLabel});
 
   final String? imageUrl;
   final String fallbackLabel;
@@ -278,7 +247,7 @@ class _WatchlistPoster extends StatelessWidget {
         child: AspectRatio(
           aspectRatio: 2 / 3,
           child: trimmedUrl == null || trimmedUrl.isEmpty
-              ? _WatchlistPosterFallback(fallbackLabel: fallbackLabel)
+              ? _PosterFallback(fallbackLabel: fallbackLabel)
               : DecoratedBox(
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHigh,
@@ -294,9 +263,7 @@ class _WatchlistPoster extends StatelessWidget {
                       return Stack(
                         fit: StackFit.expand,
                         children: [
-                          _WatchlistPosterFallback(
-                            fallbackLabel: fallbackLabel,
-                          ),
+                          _PosterFallback(fallbackLabel: fallbackLabel),
                           const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
@@ -304,9 +271,7 @@ class _WatchlistPoster extends StatelessWidget {
                       );
                     },
                     errorBuilder: (context, error, stackTrace) {
-                      return _WatchlistPosterFallback(
-                        fallbackLabel: fallbackLabel,
-                      );
+                      return _PosterFallback(fallbackLabel: fallbackLabel);
                     },
                   ),
                 ),
@@ -316,8 +281,8 @@ class _WatchlistPoster extends StatelessWidget {
   }
 }
 
-class _WatchlistPosterFallback extends StatelessWidget {
-  const _WatchlistPosterFallback({required this.fallbackLabel});
+class _PosterFallback extends StatelessWidget {
+  const _PosterFallback({required this.fallbackLabel});
 
   final String fallbackLabel;
 
@@ -337,7 +302,7 @@ class _WatchlistPosterFallback extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -362,48 +327,43 @@ class _WatchlistPosterFallback extends StatelessWidget {
   }
 }
 
-class _WatchlistSurfaceCard extends StatelessWidget {
-  const _WatchlistSurfaceCard({required this.child, this.backgroundColor});
+class _SurfaceBlock extends StatelessWidget {
+  const _SurfaceBlock({required this.child});
 
   final Widget child;
-  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: backgroundColor,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: child,
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
 }
 
-class _WatchlistCountBadge extends StatelessWidget {
-  const _WatchlistCountBadge({required this.label});
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.label, required this.color});
 
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Text(
         label,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.onPrimaryContainer,
-        ),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
       ),
     );
   }
