@@ -81,7 +81,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
             child: _SearchField(
               controller: _queryController,
               hasText: _draftQuery.trim().isNotEmpty,
@@ -190,14 +190,14 @@ class _SearchBody extends StatelessWidget {
           children: [
             _TopResultTile(series: topMatch),
             if (otherResults.isNotEmpty) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Text(
                 'More results',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               for (var index = 0; index < otherResults.length; index++) ...[
-                if (index > 0) const Divider(height: 24),
+                if (index > 0) const Divider(height: 20),
                 _SearchResultRow(series: otherResults[index]),
               ],
             ],
@@ -219,7 +219,7 @@ class _TopResultTile extends StatelessWidget {
     final metadata = <String>[
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
-    ].join('  •  ');
+    ].join(' • ');
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -232,12 +232,12 @@ class _TopResultTile extends StatelessWidget {
           onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: 108,
+                  width: 96,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: AspectRatio(
@@ -249,47 +249,59 @@ class _TopResultTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Top match',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Top match',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(series.title, style: theme.textTheme.headlineSmall),
-                      if (metadata.isNotEmpty) ...[
                         const SizedBox(height: 6),
-                        Text(
-                          metadata,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Text(series.title, style: theme.textTheme.titleLarge),
+                        if (metadata.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            metadata,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                      ],
-                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                        ],
+                        if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            series.synopsis!,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 10),
-                        Text(
-                          series.synopsis!,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        TextButton.icon(
+                          onPressed: () => context.push(
+                            AppRoutePaths.seriesDetails(series.id),
                           ),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            minimumSize: Size.zero,
+                          ),
+                          icon: const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Open series'),
                         ),
                       ],
-                      const SizedBox(height: 14),
-                      FilledButton(
-                        onPressed: () => context.push(
-                          AppRoutePaths.seriesDetails(series.id),
-                        ),
-                        child: const Text('Open Series'),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -319,63 +331,60 @@ class _SearchResultRow extends StatelessWidget {
       child: InkWell(
         onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
         borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 82,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 2 / 3,
-                    child: _SearchArtwork(
-                      imageUrl: series.posterImageUrl,
-                      label: series.title,
-                    ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 74,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 2 / 3,
+                  child: _SearchArtwork(
+                    imageUrl: series.posterImageUrl,
+                    label: series.title,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(series.title, style: theme.textTheme.titleMedium),
-                      if (metadata.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          metadata,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(series.title, style: theme.textTheme.titleMedium),
+                    if (metadata.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        metadata,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                      ],
-                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          series.synopsis!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                      ),
                     ],
-                  ),
+                    if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        series.synopsis!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );
