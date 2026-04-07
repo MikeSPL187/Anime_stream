@@ -14,8 +14,8 @@ import '../../app/router/app_router.dart';
 import 'player_screen_context.dart';
 
 const _playerAccent = Color(0xFFFF7A00);
-const _playerOutline = Color(0x26FFFFFF);
-const _playerOverlaySurface = Color(0x7A0D0D0D);
+const _playerOutline = Color(0x1FFFFFFF);
+const _playerOverlaySurface = Color(0x660D0D0D);
 
 class PlayerScreen extends ConsumerWidget {
   const PlayerScreen({super.key, this.sessionContext});
@@ -164,7 +164,7 @@ class _PlayerRouteChromeState extends State<_PlayerRouteChrome> {
               onBackRequested: _handleBackRequested,
               child: const Icon(
                 Icons.error_outline_rounded,
-                size: 40,
+                size: 36,
                 color: Colors.white,
               ),
             ),
@@ -191,26 +191,26 @@ class _MissingSessionContextState extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: _PlayerGlassPanel(
         backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.96),
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(24),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
+            constraints: const BoxConstraints(maxWidth: 340),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const _PlayerStateIcon(icon: Icons.play_circle_outline_rounded),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 Text(
-                  'Player Unavailable',
-                  style: theme.textTheme.headlineSmall,
+                  'Player unavailable',
+                  style: theme.textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'No watch session was provided. Return to a series and choose an episode to enter playback.',
+                  'Return to a series and choose an episode to enter playback.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -267,7 +267,7 @@ class _PlayerResolutionStage extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: showLandscapeLayout
               ? Row(
                   children: [
@@ -280,15 +280,15 @@ class _PlayerResolutionStage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    SizedBox(width: 340, child: sessionSummary),
+                    const SizedBox(width: 14),
+                    SizedBox(width: 320, child: sessionSummary),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _RouteBackButton(onPressed: onBackRequested),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Expanded(
                       child: _StageFrame(
                         child: _StageContent(
@@ -298,7 +298,7 @@ class _PlayerResolutionStage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     _CompactSessionSummary(
                       sessionContext: sessionContext,
                       qualityLabel: null,
@@ -883,7 +883,7 @@ class _ResolvedPlaybackSurfaceState
         onBackRequested: widget.onBackRequested,
         child: const Icon(
           Icons.error_outline_rounded,
-          size: 40,
+          size: 36,
           color: Colors.white,
         ),
       );
@@ -971,10 +971,10 @@ class _ResolvedPlaybackSurfaceState
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
-                    16,
-                    16,
-                    16,
-                    MediaQuery.paddingOf(context).bottom + 16,
+                    14,
+                    14,
+                    14,
+                    MediaQuery.paddingOf(context).bottom + 14,
                   ),
                   child: _CompactSessionSummary(
                     sessionContext: widget.sessionContext,
@@ -1017,12 +1017,12 @@ class _ResolvedPlaybackSurfaceState
       decoration: playerBackdrop,
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               Expanded(child: _StageFrame(child: stage)),
-              const SizedBox(width: 16),
-              SizedBox(width: 348, child: companionPanel),
+              const SizedBox(width: 14),
+              SizedBox(width: 332, child: companionPanel),
             ],
           ),
         ),
@@ -1155,12 +1155,12 @@ class _PlaybackStage extends StatelessWidget {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                     child: Column(
                       children: [
                         _PlayerGlassPanel(
-                          backgroundColor: const Color(0x5E111111),
-                          padding: const EdgeInsets.all(10),
+                          backgroundColor: const Color(0x56111111),
+                          padding: const EdgeInsets.all(8),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1168,7 +1168,7 @@ class _PlaybackStage extends StatelessWidget {
                                 icon: Icons.arrow_back_rounded,
                                 onPressed: onBackRequested,
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1179,29 +1179,29 @@ class _PlaybackStage extends StatelessWidget {
                                       overflow: TextOverflow.ellipsis,
                                       style: Theme.of(context)
                                           .textTheme
-                                          .titleLarge
+                                          .titleMedium
                                           ?.copyWith(
                                             color: Colors.white,
                                             fontWeight: FontWeight.w700,
                                           ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 3),
                                     Text(
                                       '${sessionContext.episodeDisplayLabel} • ${sessionContext.episodeTitle}',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: Theme.of(context)
                                           .textTheme
-                                          .bodyMedium
+                                          .bodySmall
                                           ?.copyWith(
                                             color: Colors.white70,
-                                            height: 1.25,
+                                            height: 1.2,
                                           ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               _OverlayIconButton(
                                 icon: Icons.menu_book_rounded,
                                 onPressed: () async => onOpenSeriesRequested(),
@@ -1212,8 +1212,8 @@ class _PlaybackStage extends StatelessWidget {
                         const Spacer(),
                         _PlayerGlassPanel(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 14,
+                            horizontal: 18,
+                            vertical: 12,
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1224,7 +1224,7 @@ class _PlaybackStage extends StatelessWidget {
                                   await onSeekBackward();
                                 },
                               ),
-                              const SizedBox(width: 20),
+                              const SizedBox(width: 16),
                               _OverlayTransportButton(
                                 icon: isCompleted
                                     ? Icons.replay_rounded
@@ -1236,7 +1236,7 @@ class _PlaybackStage extends StatelessWidget {
                                   await onPrimaryAction();
                                 },
                               ),
-                              const SizedBox(width: 20),
+                              const SizedBox(width: 16),
                               _OverlayTransportButton(
                                 icon: Icons.forward_10_rounded,
                                 onPressed: () async {
@@ -1248,7 +1248,7 @@ class _PlaybackStage extends StatelessWidget {
                         ),
                         const Spacer(),
                         _PlayerGlassPanel(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1259,13 +1259,13 @@ class _PlaybackStage extends StatelessWidget {
                                 onInteractionStart: onTimelineInteractionStart,
                                 onInteractionEnd: onTimelineInteractionEnd,
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 8),
                               Row(
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${sessionContext.episodeDisplayLabel} • $qualityLabel • $playbackStateLabel',
-                                      maxLines: 2,
+                                      '${sessionContext.episodeDisplayLabel} • $qualityLabel',
+                                      maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: Theme.of(context)
                                           .textTheme
@@ -1273,25 +1273,30 @@ class _PlaybackStage extends StatelessWidget {
                                           ?.copyWith(color: Colors.white70),
                                     ),
                                   ),
-                                  if (canToggleFullscreen)
-                                    TextButton.icon(
+                                  Text(
+                                    playbackStateLabel,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(color: _playerAccent),
+                                  ),
+                                  if (canToggleFullscreen) ...[
+                                    const SizedBox(width: 10),
+                                    IconButton(
                                       onPressed: () {
                                         unawaited(onToggleFullscreen());
                                       },
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: Colors.white,
-                                      ),
                                       icon: Icon(
                                         isFullscreen
                                             ? Icons.fullscreen_exit_rounded
                                             : Icons.fullscreen_rounded,
+                                        color: Colors.white,
                                       ),
-                                      label: Text(
-                                        isFullscreen
-                                            ? 'Exit Fullscreen'
-                                            : 'Enter Fullscreen',
-                                      ),
+                                      tooltip: isFullscreen
+                                          ? 'Exit Fullscreen'
+                                          : 'Enter Fullscreen',
                                     ),
+                                  ],
                                 ],
                               ),
                             ],
@@ -1341,25 +1346,25 @@ class _SessionSummaryPanel extends StatelessWidget {
 
     return _PlayerGlassPanel(
       backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.98),
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             sessionContext.seriesTitle,
-            style: theme.textTheme.headlineSmall?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             sessionContext.episodeTitle,
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              height: 1.25,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1382,19 +1387,19 @@ class _SessionSummaryPanel extends StatelessWidget {
             ],
           ),
           if (statusText.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               statusText,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                height: 1.3,
+                height: 1.25,
               ),
             ),
           ],
-          if (timeline != null) ...[const SizedBox(height: 18), timeline!],
-          const SizedBox(height: 22),
+          if (timeline != null) ...[const SizedBox(height: 14), timeline!],
+          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -1405,7 +1410,7 @@ class _SessionSummaryPanel extends StatelessWidget {
             ),
           ),
           if (secondaryActionLabel != null && onSecondaryAction != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -1458,37 +1463,37 @@ class _CompactSessionSummary extends StatelessWidget {
 
     return _PlayerGlassPanel(
       backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.96),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             sessionContext.seriesTitle,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             sessionContext.episodeTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           if (details.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               details,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             statusLabel,
             style: theme.textTheme.labelLarge?.copyWith(
@@ -1496,7 +1501,7 @@ class _CompactSessionSummary extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             statusText,
             maxLines: 2,
@@ -1505,7 +1510,7 @@ class _CompactSessionSummary extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -1516,7 +1521,7 @@ class _CompactSessionSummary extends StatelessWidget {
             ),
           ),
           if (secondaryActionLabel != null && onSecondaryAction != null) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -1659,16 +1664,16 @@ class _StageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.black,
           border: Border.all(color: _playerOutline),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x55000000),
-              blurRadius: 28,
-              offset: Offset(0, 18),
+              color: Color(0x44000000),
+              blurRadius: 22,
+              offset: Offset(0, 14),
             ),
           ],
         ),
@@ -1693,19 +1698,17 @@ class _StageContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
+          constraints: const BoxConstraints(maxWidth: 420),
           child: _PlayerGlassPanel(
             backgroundColor: _playerOverlaySurface,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const _PlayerOverlayEyebrow(label: 'Playback'),
-                const SizedBox(height: 14),
                 _PlayerStateIcon(child: child),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -1719,7 +1722,7 @@ class _StageContent extends StatelessWidget {
                   message,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.white70,
-                    height: 1.35,
+                    height: 1.3,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -1748,35 +1751,17 @@ class _PlayerGlassPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: backgroundColor ?? _playerOverlaySurface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _playerOutline),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 18,
-            offset: Offset(0, 10),
+            color: Color(0x29000000),
+            blurRadius: 14,
+            offset: Offset(0, 8),
           ),
         ],
       ),
       child: Padding(padding: padding, child: child),
-    );
-  }
-}
-
-class _PlayerOverlayEyebrow extends StatelessWidget {
-  const _PlayerOverlayEyebrow({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label.toUpperCase(),
-      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-        color: _playerAccent,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1.1,
-      ),
     );
   }
 }
@@ -1790,15 +1775,15 @@ class _PlayerStateIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 68,
-      height: 68,
+      width: 62,
+      height: 62,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.08),
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
-      child: child ?? Icon(icon, color: Colors.white, size: 34),
+      child: child ?? Icon(icon, color: Colors.white, size: 30),
     );
   }
 }
@@ -1834,11 +1819,16 @@ class _OverlayIconButton extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
-      child: IconButton(
-        onPressed: () {
-          unawaited(onPressed());
-        },
-        icon: Icon(icon, color: Colors.white),
+      child: SizedBox(
+        width: 42,
+        height: 42,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          onPressed: () {
+            unawaited(onPressed());
+          },
+          icon: Icon(icon, color: Colors.white, size: 20),
+        ),
       ),
     );
   }
@@ -1876,16 +1866,16 @@ class _OverlayTransportButton extends StatelessWidget {
         boxShadow: isPrimary
             ? const [
                 BoxShadow(
-                  color: Color(0x55FF7A00),
-                  blurRadius: 22,
-                  offset: Offset(0, 10),
+                  color: Color(0x45FF7A00),
+                  blurRadius: 16,
+                  offset: Offset(0, 8),
                 ),
               ]
             : null,
       ),
       child: SizedBox(
-        width: isPrimary ? 72 : 56,
-        height: isPrimary ? 72 : 56,
+        width: isPrimary ? 64 : 52,
+        height: isPrimary ? 64 : 52,
         child: IconButton(
           onPressed: () {
             unawaited(onPressed());
@@ -1893,7 +1883,7 @@ class _OverlayTransportButton extends StatelessWidget {
           icon: Icon(
             icon,
             color: isPrimary ? Colors.black : Colors.white,
-            size: isPrimary ? 34 : 24,
+            size: isPrimary ? 30 : 22,
           ),
         ),
       ),
@@ -1914,7 +1904,7 @@ class _HeaderChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.24)),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Text(
         label,
