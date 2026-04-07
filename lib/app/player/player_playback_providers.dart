@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/adapters/anilibria/anilibria_remote_data_source.dart';
@@ -15,6 +14,7 @@ final playerPlaybackResolverProvider = Provider<PlayerPlaybackResolver>((ref) {
   return PlayerPlaybackResolver(
     remoteDataSource: ref.watch(anilibriaRemoteDataSourceProvider),
     downloadsRepository: ref.watch(downloadsRepositoryProvider),
+    dio: ref.watch(anilibriaDioProvider),
   );
 });
 
@@ -28,11 +28,16 @@ class PlayerPlaybackResolver {
   PlayerPlaybackResolver({
     required AnilibriaRemoteDataSource remoteDataSource,
     required DownloadsRepository downloadsRepository,
+    Dio? dio,
   }) : _remoteDataSource = remoteDataSource,
-       _downloadsRepository = downloadsRepository;
+       _downloadsRepository = downloadsRepository,
+       _dio = dio;
+
+  static const _remotePlaybackPreflightTimeout = Duration(seconds: 3);
 
   final AnilibriaRemoteDataSource _remoteDataSource;
   final DownloadsRepository _downloadsRepository;
+  final Dio? _dio;
 
   Future<PlayerPlaybackSource> resolve(PlayerScreenContext context) async {
     final localDownload = await _downloadsRepository.getPlayableDownload(
@@ -43,9 +48,13 @@ class PlayerPlaybackResolver {
       final localAssetUri = localDownload.localAssetUri;
       if (localAssetUri != null && localAssetUri.trim().isNotEmpty) {
         return PlayerPlaybackSource(
-          sourceUri: localAssetUri,
-          qualityLabel: '${localDownload.selectedQuality} offline',
-          kind: _mapDownloadSourceKind(localDownload.sourceKind),
+          variants: [
+            PlayerPlaybackVariant(
+              sourceUri: localAssetUri,
+              qualityLabel: '${localDownload.selectedQuality} offline',
+              kind: _mapDownloadSourceKind(localDownload.sourceKind),
+            ),
+          ],
         );
       }
     }
@@ -61,18 +70,15 @@ class PlayerPlaybackResolver {
         );
       }
 
-      final stream = _pickPreferredStream(episode);
-      if (stream == null) {
+      final remoteVariants = _buildRemoteVariants(episode);
+      if (remoteVariants.isEmpty) {
         throw PlayerPlaybackResolutionException(
-          'No supported HLS stream is available for ${context.episodeDisplayLabel}.',
+          'No supported remote playback variants are available for ${context.episodeDisplayLabel}.',
         );
       }
 
-      return PlayerPlaybackSource(
-        sourceUri: stream.streamUri,
-        qualityLabel: stream.qualityLabel,
-        kind: PlayerPlaybackSourceKind.remoteHls,
-      );
+      final orderedVariants = await _preflightRemoteVariants(remoteVariants);
+      return PlayerPlaybackSource(variants: orderedVariants);
     } on DioException catch (error) {
       throw PlayerPlaybackResolutionException(
         'Failed to load release data for playback.'
@@ -136,13 +142,16 @@ class PlayerPlaybackResolver {
     return null;
   }
 
-  _ResolvedStreamCandidate? _pickPreferredStream(AnilibriaEpisodeDto episode) {
+  List<PlayerPlaybackVariant> _buildRemoteVariants(
+    AnilibriaEpisodeDto episode,
+  ) {
     const streamCandidates = [
       ('1080p', 'hls1080Url'),
       ('720p', 'hls720Url'),
       ('480p', 'hls480Url'),
     ];
 
+    final variants = <PlayerPlaybackVariant>[];
     for (final (qualityLabel, key) in streamCandidates) {
       final streamUri = switch (key) {
         'hls1080Url' => episode.hls1080Url,
@@ -150,15 +159,67 @@ class PlayerPlaybackResolver {
         'hls480Url' => episode.hls480Url,
         _ => null,
       };
-      if (streamUri != null && streamUri.isNotEmpty) {
-        return _ResolvedStreamCandidate(
+
+      final trimmedStreamUri = streamUri?.trim();
+      if (trimmedStreamUri == null || trimmedStreamUri.isEmpty) {
+        continue;
+      }
+
+      variants.add(
+        PlayerPlaybackVariant(
+          sourceUri: trimmedStreamUri,
           qualityLabel: qualityLabel,
-          streamUri: streamUri,
-        );
+          kind: PlayerPlaybackSourceKind.remoteHls,
+        ),
+      );
+    }
+
+    return variants;
+  }
+
+  Future<List<PlayerPlaybackVariant>> _preflightRemoteVariants(
+    List<PlayerPlaybackVariant> variants,
+  ) async {
+    if (_dio == null) {
+      return variants;
+    }
+
+    final successfulVariants = <PlayerPlaybackVariant>[];
+    for (final variant in variants) {
+      if (variant.kind != PlayerPlaybackSourceKind.remoteHls) {
+        continue;
+      }
+
+      final preflightSucceeded = await _preflightRemoteVariant(variant);
+      if (preflightSucceeded) {
+        successfulVariants.add(variant);
       }
     }
 
-    return null;
+    if (successfulVariants.isNotEmpty) {
+      return successfulVariants;
+    }
+
+    return variants;
+  }
+
+  Future<bool> _preflightRemoteVariant(PlayerPlaybackVariant variant) async {
+    try {
+      final response = await _dio!.getUri<String>(
+        Uri.parse(variant.sourceUri),
+        options: Options(
+          responseType: ResponseType.plain,
+          sendTimeout: _remotePlaybackPreflightTimeout,
+          receiveTimeout: _remotePlaybackPreflightTimeout,
+        ),
+      );
+      final body = response.data;
+      return body != null && body.trim().isNotEmpty;
+    } on DioException {
+      return false;
+    } on FormatException {
+      return false;
+    }
   }
 }
 
@@ -169,15 +230,4 @@ class PlayerPlaybackResolutionException implements Exception {
 
   @override
   String toString() => message;
-}
-
-@immutable
-class _ResolvedStreamCandidate {
-  const _ResolvedStreamCandidate({
-    required this.qualityLabel,
-    required this.streamUri,
-  });
-
-  final String qualityLabel;
-  final String streamUri;
 }

@@ -201,9 +201,7 @@ class _MissingSessionContextState extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const _PlayerStateIcon(
-                  icon: Icons.play_circle_outline_rounded,
-                ),
+                const _PlayerStateIcon(icon: Icons.play_circle_outline_rounded),
                 const SizedBox(height: 20),
                 Text(
                   'Player Unavailable',
@@ -353,19 +351,32 @@ class _ResolvedPlaybackSurfaceState
   bool _isPlaying = true;
   bool _isBuffering = false;
   bool _isCompleted = false;
+  bool _hasOpenedPlayback = false;
+  bool _isRecoveringPlaybackError = false;
+  int _activeVariantIndex = 0;
   Duration _latestPosition = Duration.zero;
   Duration? _latestTotalDuration;
   Duration _lastPersistedPosition = Duration.zero;
 
+  PlayerPlaybackVariant get _currentVariant =>
+      widget.playbackSource.variantAt(_activeVariantIndex);
+
+  String get _activeQualityLabel => _currentVariant.qualityLabel;
+
   @override
   void initState() {
     super.initState();
+    _activeVariantIndex = widget.playbackSource.selectedVariantIndex;
     unawaited(_openPlayback());
   }
 
   @override
   void didUpdateWidget(covariant _ResolvedPlaybackSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (!identical(oldWidget.playbackSource, widget.playbackSource)) {
+      _activeVariantIndex = widget.playbackSource.selectedVariantIndex;
+    }
 
     if (widget.isFullscreen && _isPlaying) {
       _scheduleControlsAutoHide();
@@ -383,15 +394,10 @@ class _ResolvedPlaybackSurfaceState
       final progressController = ref.read(playerProgressControllerProvider);
 
       _errorSubscription = player.stream.error.listen((message) {
-        if (!mounted) {
-          _playbackError = message;
+        if (!_hasOpenedPlayback) {
           return;
         }
-
-        setState(() {
-          _playbackError = message;
-        });
-        _showControls();
+        unawaited(_handlePlaybackError(message));
       });
 
       _positionSubscription = player.stream.position.listen((position) {
@@ -466,7 +472,17 @@ class _ResolvedPlaybackSurfaceState
         }
       });
 
-      await player.open(Media(widget.playbackSource.streamUri));
+      final didOpen = await _openResolvedSource(
+        player,
+        widget.playbackSource.selectedVariantIndex,
+      );
+      if (!didOpen) {
+        throw StateError(
+          'Playback could not be opened from any available stream.',
+        );
+      }
+
+      _hasOpenedPlayback = true;
       await _restoreSavedProgress(progressController, player);
 
       if (!mounted) {
@@ -479,19 +495,170 @@ class _ResolvedPlaybackSurfaceState
         _player = player;
         _videoController = videoController;
         _isOpening = false;
+        _playbackError = null;
       });
 
       _scheduleControlsAutoHide();
     } catch (error) {
       if (!mounted) {
+        _playbackError =
+            'Playback could not be opened from any available stream.';
         return;
       }
 
       setState(() {
-        _playbackError = error.toString();
+        _playbackError =
+            'Playback could not be opened from any available stream.';
         _isOpening = false;
       });
       _showControls();
+    }
+  }
+
+  Future<bool> _openResolvedSource(
+    Player player,
+    int startIndex, {
+    bool restorePosition = false,
+  }) async {
+    var variantIndex = startIndex;
+
+    while (true) {
+      final didOpen = await _openPlaybackVariant(
+        player,
+        variantIndex,
+        restorePosition: restorePosition,
+      );
+      if (didOpen) {
+        return true;
+      }
+
+      final nextVariantIndex = widget.playbackSource.nextVariantIndexAfter(
+        variantIndex,
+      );
+      if (nextVariantIndex == null) {
+        return false;
+      }
+
+      variantIndex = nextVariantIndex;
+    }
+  }
+
+  Future<bool> _openPlaybackVariant(
+    Player player,
+    int variantIndex, {
+    bool restorePosition = false,
+  }) async {
+    final variant = widget.playbackSource.variantAt(variantIndex);
+
+    if (mounted) {
+      setState(() {
+        _activeVariantIndex = variantIndex;
+        _isOpening = true;
+        _isCompleted = false;
+        _playbackError = null;
+      });
+    } else {
+      _activeVariantIndex = variantIndex;
+      _isOpening = true;
+      _isCompleted = false;
+      _playbackError = null;
+    }
+
+    try {
+      await player.open(Media(variant.sourceUri));
+
+      if (restorePosition && _latestPosition > Duration.zero) {
+        try {
+          await player.seek(_latestPosition);
+        } catch (_) {
+          // Recovery seek is best-effort only.
+        }
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _handlePlaybackError(String message) async {
+    final recovered = await _tryRecoverFromPlaybackError();
+    if (recovered) {
+      return;
+    }
+
+    if (!mounted) {
+      _playbackError =
+          'Playback failed and no other stream remained available.';
+      _isOpening = false;
+      return;
+    }
+
+    setState(() {
+      _playbackError =
+          'Playback failed and no other stream remained available.';
+      _isOpening = false;
+    });
+    _showControls();
+  }
+
+  Future<bool> _tryRecoverFromPlaybackError() async {
+    if (_isRecoveringPlaybackError) {
+      return false;
+    }
+
+    if (_currentVariant.kind != PlayerPlaybackSourceKind.remoteHls) {
+      return false;
+    }
+
+    final player = _player;
+    if (player == null) {
+      return false;
+    }
+
+    final nextVariantIndex = widget.playbackSource.nextVariantIndexAfter(
+      _activeVariantIndex,
+    );
+    if (nextVariantIndex == null) {
+      return false;
+    }
+
+    _isRecoveringPlaybackError = true;
+    if (mounted) {
+      setState(() {
+        _isOpening = true;
+        _playbackError = null;
+      });
+    } else {
+      _isOpening = true;
+      _playbackError = null;
+    }
+
+    try {
+      final didRecover = await _openResolvedSource(
+        player,
+        nextVariantIndex,
+        restorePosition: _latestPosition > Duration.zero,
+      );
+      if (!didRecover) {
+        return false;
+      }
+
+      if (!mounted) {
+        _isOpening = false;
+        _isCompleted = false;
+        return true;
+      }
+
+      setState(() {
+        _isOpening = false;
+        _isCompleted = false;
+        _playbackError = null;
+      });
+      _scheduleControlsAutoHide();
+      return true;
+    } finally {
+      _isRecoveringPlaybackError = false;
     }
   }
 
@@ -718,8 +885,7 @@ class _ResolvedPlaybackSurfaceState
       return _PlayerResolutionStage(
         sessionContext: widget.sessionContext,
         title: 'Opening Stream',
-        message:
-            'Opening ${widget.playbackSource.qualityLabel} playback for this episode.',
+        message: 'Opening $_activeQualityLabel playback for this episode.',
         onBackRequested: widget.onBackRequested,
         child: const CircularProgressIndicator(),
       );
@@ -727,12 +893,12 @@ class _ResolvedPlaybackSurfaceState
 
     final isHandset = _isHandsetLayout(context);
     final showHandsetCompanion = isHandset && !widget.isFullscreen;
-    final streamHost = Uri.tryParse(widget.playbackSource.streamUri)?.host;
+    final streamHost = Uri.tryParse(_currentVariant.sourceUri)?.host;
     final stage = _PlaybackStage(
       videoController: _videoController!,
       player: _player!,
       sessionContext: widget.sessionContext,
-      qualityLabel: widget.playbackSource.qualityLabel,
+      qualityLabel: _activeQualityLabel,
       isPlaying: _isPlaying,
       isBuffering: _isBuffering,
       isCompleted: _isCompleted,
@@ -752,7 +918,7 @@ class _ResolvedPlaybackSurfaceState
 
     final companionPanel = _SessionSummaryPanel(
       sessionContext: widget.sessionContext,
-      qualityLabel: widget.playbackSource.qualityLabel,
+      qualityLabel: _activeQualityLabel,
       streamHost: streamHost,
       statusText: _statusMessage(),
       statusLabel: _statusLabel(),
@@ -1211,10 +1377,7 @@ class _SessionSummaryPanel extends StatelessWidget {
                   label: streamHost!,
                   color: theme.colorScheme.tertiary,
                 ),
-              _HeaderChip(
-                label: statusLabel,
-                color: theme.colorScheme.primary,
-              ),
+              _HeaderChip(label: statusLabel, color: theme.colorScheme.primary),
             ],
           ),
           if (timeline != null) ...[
@@ -1444,9 +1607,7 @@ class _StageContent extends StatelessWidget {
                 const SizedBox(height: 18),
                 Text(
                   title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1455,9 +1616,7 @@ class _StageContent extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   message,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.white70,
                     height: 1.35,
                   ),
@@ -1538,8 +1697,7 @@ class _PlayerStateIcon extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
-      child: child ??
-          Icon(icon, color: Colors.white, size: 34),
+      child: child ?? Icon(icon, color: Colors.white, size: 34),
     );
   }
 }
@@ -1658,9 +1816,7 @@ class _PlaybackBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(
-          context,
-        ).textTheme.labelMedium?.copyWith(
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: Colors.white,
           fontWeight: FontWeight.w600,
         ),

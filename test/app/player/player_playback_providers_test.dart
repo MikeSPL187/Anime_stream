@@ -85,47 +85,44 @@ void main() {
       expect(source.streamUri, 'https://cdn.example.com/bonus-720.m3u8');
     });
 
-    test(
-      'throws when the matched episode has no supported HLS stream',
-      () async {
-        final resolver = PlayerPlaybackResolver(
-          remoteDataSource: _FakeAnilibriaRemoteDataSource(
-            release: const AnilibriaReleaseDto(
-              id: 'series-12',
-              episodes: [
-                AnilibriaEpisodeDto(
-                  id: 'episode-1',
-                  releaseId: 'series-12',
-                  ordinal: 1,
-                  numberLabel: '1',
-                  title: 'Pilot',
-                ),
-              ],
-            ),
+    test('throws when the matched episode has no supported HLS stream', () async {
+      final resolver = PlayerPlaybackResolver(
+        remoteDataSource: _FakeAnilibriaRemoteDataSource(
+          release: const AnilibriaReleaseDto(
+            id: 'series-12',
+            episodes: [
+              AnilibriaEpisodeDto(
+                id: 'episode-1',
+                releaseId: 'series-12',
+                ordinal: 1,
+                numberLabel: '1',
+                title: 'Pilot',
+              ),
+            ],
           ),
-          downloadsRepository: const _NoOpDownloadsRepository(),
-        );
+        ),
+        downloadsRepository: const _NoOpDownloadsRepository(),
+      );
 
-        await expectLater(
-          () => resolver.resolve(
-            const PlayerScreenContext(
-              seriesId: 'series-12',
-              seriesTitle: 'Serial Experiments Lain',
-              episodeId: 'episode-1',
-              episodeNumberLabel: '1',
-              episodeTitle: 'Pilot',
-            ),
+      await expectLater(
+        () => resolver.resolve(
+          const PlayerScreenContext(
+            seriesId: 'series-12',
+            seriesTitle: 'Serial Experiments Lain',
+            episodeId: 'episode-1',
+            episodeNumberLabel: '1',
+            episodeTitle: 'Pilot',
           ),
-          throwsA(
-            isA<PlayerPlaybackResolutionException>().having(
-              (error) => error.message,
-              'message',
-              'No supported HLS stream is available for Episode 1.',
-            ),
+        ),
+        throwsA(
+          isA<PlayerPlaybackResolutionException>().having(
+            (error) => error.message,
+            'message',
+            'No supported remote playback variants are available for Episode 1.',
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
   });
 }
 
