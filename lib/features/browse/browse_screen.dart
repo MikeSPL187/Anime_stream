@@ -29,6 +29,16 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
             icon: const Icon(Icons.grid_view_rounded),
             tooltip: 'Catalog',
           ),
+          IconButton(
+            onPressed: () => context.push(AppRoutePaths.search),
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Search',
+          ),
+          IconButton(
+            onPressed: () => context.push(AppRoutePaths.settings),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+          ),
         ],
       ),
       body: browseCatalog.when(
@@ -77,10 +87,7 @@ class _BrowseContent extends StatelessWidget {
               'Move across the real discovery slices already backed by the repository.',
         ),
         const SizedBox(height: 20),
-        _ModeSelector(
-          selectedMode: selectedMode,
-          onSelectMode: onSelectMode,
-        ),
+        _ModeSelector(selectedMode: selectedMode, onSelectMode: onSelectMode),
         const SizedBox(height: 24),
         if (!catalog.hasAnyContent)
           const _BrowseMessageState(
@@ -99,32 +106,30 @@ class _BrowseContent extends StatelessWidget {
   }
 
   List<_BrowseSection> _sections(BrowseCatalogData catalog) => [
-        _BrowseSection(
-          mode: BrowseDiscoveryMode.latest,
-          title: 'Latest Releases',
-          description: 'Freshly surfaced anime from the current feed.',
-          seriesList: catalog.latestReleases,
-        ),
-        _BrowseSection(
-          mode: BrowseDiscoveryMode.trending,
-          title: 'Trending Ongoing',
-          description: 'Ongoing anime ordered by fresh release activity.',
-          seriesList: catalog.trendingSeries,
-        ),
-        _BrowseSection(
-          mode: BrowseDiscoveryMode.popular,
-          title: 'Popular Catalog',
-          description: 'Stronger general catalog picks from rating-sorted discovery.',
-          seriesList: catalog.popularSeries,
-        ),
-      ];
+    _BrowseSection(
+      mode: BrowseDiscoveryMode.latest,
+      title: 'Latest Releases',
+      description: 'Freshly surfaced anime from the current feed.',
+      seriesList: catalog.latestReleases,
+    ),
+    _BrowseSection(
+      mode: BrowseDiscoveryMode.trending,
+      title: 'Trending Ongoing',
+      description: 'Ongoing anime ordered by fresh release activity.',
+      seriesList: catalog.trendingSeries,
+    ),
+    _BrowseSection(
+      mode: BrowseDiscoveryMode.popular,
+      title: 'Popular Catalog',
+      description:
+          'Stronger general catalog picks from rating-sorted discovery.',
+      seriesList: catalog.popularSeries,
+    ),
+  ];
 }
 
 class _BrowseAllBody extends StatelessWidget {
-  const _BrowseAllBody({
-    required this.sections,
-    required this.onSelectMode,
-  });
+  const _BrowseAllBody({required this.sections, required this.onSelectMode});
 
   final List<_BrowseSection> sections;
   final ValueChanged<BrowseDiscoveryMode> onSelectMode;
@@ -157,17 +162,16 @@ class _BrowseAllBody extends StatelessWidget {
 }
 
 class _BrowseFocusedBody extends StatelessWidget {
-  const _BrowseFocusedBody({
-    required this.section,
-    required this.onSelectMode,
-  });
+  const _BrowseFocusedBody({required this.section, required this.onSelectMode});
 
   final _BrowseSection section;
   final ValueChanged<BrowseDiscoveryMode> onSelectMode;
 
   @override
   Widget build(BuildContext context) {
-    final spotlight = section.seriesList.isEmpty ? null : section.seriesList.first;
+    final spotlight = section.seriesList.isEmpty
+        ? null
+        : section.seriesList.first;
     final gridItems = section.seriesList.length <= 1
         ? section.seriesList
         : section.seriesList.sublist(1);
@@ -229,10 +233,7 @@ class _LeadHeader extends StatelessWidget {
 }
 
 class _ModeSelector extends StatelessWidget {
-  const _ModeSelector({
-    required this.selectedMode,
-    required this.onSelectMode,
-  });
+  const _ModeSelector({required this.selectedMode, required this.onSelectMode});
 
   final BrowseDiscoveryMode selectedMode;
   final ValueChanged<BrowseDiscoveryMode> onSelectMode;
@@ -340,7 +341,8 @@ class _BrowseHero extends StatelessWidget {
                 ],
                 const SizedBox(height: 14),
                 FilledButton.icon(
-                  onPressed: () => context.push(AppRoutePaths.seriesDetails(series.id)),
+                  onPressed: () =>
+                      context.push(AppRoutePaths.seriesDetails(series.id)),
                   icon: const Icon(Icons.arrow_forward_rounded),
                   label: const Text('Open series'),
                 ),
@@ -354,10 +356,7 @@ class _BrowseHero extends StatelessWidget {
 }
 
 class _BrowseRail extends StatelessWidget {
-  const _BrowseRail({
-    required this.section,
-    required this.onFocus,
-  });
+  const _BrowseRail({required this.section, required this.onFocus});
 
   final _BrowseSection section;
   final VoidCallback onFocus;
@@ -407,10 +406,7 @@ class _BrowseRail extends StatelessWidget {
 }
 
 class _FocusHeader extends StatelessWidget {
-  const _FocusHeader({
-    required this.section,
-    required this.onBack,
-  });
+  const _FocusHeader({required this.section, required this.onBack});
 
   final _BrowseSection section;
   final VoidCallback onBack;
@@ -523,8 +519,8 @@ class _BrowseGrid extends StatelessWidget {
         final columns = constraints.maxWidth >= 900
             ? 3
             : constraints.maxWidth >= 560
-                ? 2
-                : 1;
+            ? 2
+            : 1;
 
         return GridView.builder(
           shrinkWrap: true,
@@ -744,10 +740,7 @@ class _ColorChip extends StatelessWidget {
 }
 
 class _BrowseMessageState extends StatelessWidget {
-  const _BrowseMessageState({
-    required this.title,
-    required this.message,
-  });
+  const _BrowseMessageState({required this.title, required this.message});
 
   final String title;
   final String message;

@@ -17,7 +17,21 @@ class MyListsScreen extends ConsumerWidget {
     final history = ref.watch(watchHistoryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Lists')),
+      appBar: AppBar(
+        title: const Text('My Lists'),
+        actions: [
+          IconButton(
+            onPressed: () => context.push(AppRoutePaths.search),
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Search',
+          ),
+          IconButton(
+            onPressed: () => context.push(AppRoutePaths.settings),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: [
@@ -85,11 +99,15 @@ class _SummaryStrip extends StatelessWidget {
       runSpacing: 8,
       children: [
         _Badge(
-          label: watchlistCount == null ? 'Watchlist loading' : '${watchlistCount!} saved',
+          label: watchlistCount == null
+              ? 'Watchlist loading'
+              : '${watchlistCount!} saved',
           color: theme.colorScheme.primary,
         ),
         _Badge(
-          label: historyCount == null ? 'History loading' : '${historyCount!} watched',
+          label: historyCount == null
+              ? 'History loading'
+              : '${historyCount!} watched',
           color: theme.colorScheme.tertiary,
         ),
       ],
@@ -107,10 +125,11 @@ class _WatchlistSection extends StatelessWidget {
     final theme = Theme.of(context);
 
     return watchlist.when(
-      loading: () => const _PanelCard(child: _LoadingRow(label: 'Loading saved titles...')),
-      error: (error, stackTrace) => _PanelCard(
-        child: Text('Watchlist unavailable.\n$error'),
+      loading: () => const _PanelCard(
+        child: _LoadingRow(label: 'Loading saved titles...'),
       ),
+      error: (error, stackTrace) =>
+          _PanelCard(child: Text('Watchlist unavailable.\n$error')),
       data: (entries) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -125,13 +144,19 @@ class _WatchlistSection extends StatelessWidget {
           const SizedBox(height: 16),
           if (entries.isEmpty)
             const _PanelCard(
-              child: Text('No saved anime yet. Add titles from their series pages.'),
+              child: Text(
+                'No saved anime yet. Add titles from their series pages.',
+              ),
             )
           else
             _PanelCard(
               child: Column(
                 children: [
-                  for (var index = 0; index < entries.take(3).length; index++) ...[
+                  for (
+                    var index = 0;
+                    index < entries.take(3).length;
+                    index++
+                  ) ...[
                     if (index > 0) const Divider(height: 20),
                     _WatchlistRow(entry: entries[index]),
                   ],
@@ -167,10 +192,11 @@ class _HistorySection extends StatelessWidget {
     final theme = Theme.of(context);
 
     return history.when(
-      loading: () => const _PanelCard(child: _LoadingRow(label: 'Loading watch history...')),
-      error: (error, stackTrace) => _PanelCard(
-        child: Text('History unavailable.\n$error'),
+      loading: () => const _PanelCard(
+        child: _LoadingRow(label: 'Loading watch history...'),
       ),
+      error: (error, stackTrace) =>
+          _PanelCard(child: Text('History unavailable.\n$error')),
       data: (entries) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -185,13 +211,19 @@ class _HistorySection extends StatelessWidget {
           const SizedBox(height: 16),
           if (entries.isEmpty)
             const _PanelCard(
-              child: Text('No completed episodes yet. Finished anime will appear here.'),
+              child: Text(
+                'No completed episodes yet. Finished anime will appear here.',
+              ),
             )
           else
             _PanelCard(
               child: Column(
                 children: [
-                  for (var index = 0; index < entries.take(3).length; index++) ...[
+                  for (
+                    var index = 0;
+                    index < entries.take(3).length;
+                    index++
+                  ) ...[
                     if (index > 0) const Divider(height: 20),
                     _HistoryRow(entry: entries[index]),
                   ],
@@ -234,16 +266,16 @@ class _WatchlistRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Poster(imageUrl: entry.series.posterImageUrl, label: entry.series.title),
+            _Poster(
+              imageUrl: entry.series.posterImageUrl,
+              label: entry.series.title,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Badge(
-                    label: 'Saved',
-                    color: theme.colorScheme.primary,
-                  ),
+                  _Badge(label: 'Saved', color: theme.colorScheme.primary),
                   const SizedBox(height: 10),
                   Text(entry.series.title, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 4),
@@ -283,16 +315,16 @@ class _HistoryRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Poster(imageUrl: entry.series.posterImageUrl, label: entry.series.title),
+            _Poster(
+              imageUrl: entry.series.posterImageUrl,
+              label: entry.series.title,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Badge(
-                    label: 'Completed',
-                    color: theme.colorScheme.tertiary,
-                  ),
+                  _Badge(label: 'Completed', color: theme.colorScheme.tertiary),
                   const SizedBox(height: 10),
                   Text(entry.series.title, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 4),
@@ -339,7 +371,9 @@ class _Poster extends StatelessWidget {
           child: trimmedUrl == null || trimmedUrl.isEmpty
               ? _PosterFallback(label: label)
               : DecoratedBox(
-                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHigh),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHigh,
+                  ),
                   child: Image.network(
                     trimmedUrl,
                     fit: BoxFit.cover,
@@ -349,7 +383,9 @@ class _Poster extends StatelessWidget {
                         fit: StackFit.expand,
                         children: [
                           _PosterFallback(label: label),
-                          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                         ],
                       );
                     },
@@ -388,7 +424,10 @@ class _PosterFallback extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.movie_creation_outlined, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.movie_creation_outlined,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 8),
             Text(
               label,
@@ -411,7 +450,9 @@ class _PanelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(child: Padding(padding: const EdgeInsets.all(18), child: child));
+    return Card(
+      child: Padding(padding: const EdgeInsets.all(18), child: child),
+    );
   }
 }
 

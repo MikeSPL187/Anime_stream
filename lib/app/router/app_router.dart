@@ -32,18 +32,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const BrowseScreen(),
           ),
           GoRoute(
-            path: AppRoutePaths.search,
-            builder: (context, state) => const SearchScreen(),
-          ),
-          GoRoute(
             path: AppRoutePaths.myLists,
             builder: (context, state) => const MyListsScreen(),
           ),
-          GoRoute(
-            path: AppRoutePaths.settings,
-            builder: (context, state) => const SettingsScreen(),
-          ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutePaths.search,
+        builder: (context, state) => const SearchScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePaths.settings,
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: AppRoutePaths.series,

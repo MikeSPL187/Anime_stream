@@ -18,7 +18,21 @@ class HomeScreen extends ConsumerWidget {
     final browseCatalog = ref.watch(browseCatalogProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Home')),
+      appBar: AppBar(
+        title: const Text('Home'),
+        actions: [
+          IconButton(
+            onPressed: () => context.push(AppRoutePaths.search),
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Search',
+          ),
+          IconButton(
+            onPressed: () => context.push(AppRoutePaths.settings),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
       body: _HomeLaunchSurface(
         featuredSeries: featuredSeries,
         continueWatching: continueWatching,
@@ -59,8 +73,6 @@ class _HomeLaunchSurface extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
-          const _HomeLeadStrip(),
-          const SizedBox(height: 20),
           _ContinueWatchingSection(continueWatching: continueWatching),
           const SizedBox(height: 24),
           if (featuredData != null && featuredData.isNotEmpty)
@@ -77,51 +89,6 @@ class _HomeLaunchSurface extends StatelessWidget {
           _DiscoveryLaunchSection(
             featuredSeries: featuredData ?? const <Series>[],
             browseCatalog: browseCatalog,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeLeadStrip extends StatelessWidget {
-  const _HomeLeadStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return _SurfaceCard(
-      backgroundColor: theme.colorScheme.surfaceContainerLow,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Start Watching', style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-            'Home is your launch surface: jump back into active episodes, open featured anime, or branch into the current AniLibria discovery slices.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _LeadChip(
-                label: 'Single-user anime app',
-                color: theme.colorScheme.primary,
-              ),
-              _LeadChip(
-                label: 'AniLibria powered',
-                color: theme.colorScheme.secondary,
-              ),
-              _LeadChip(
-                label: 'Watch-first layout',
-                color: theme.colorScheme.tertiary,
-              ),
-            ],
           ),
         ],
       ),
@@ -672,12 +639,10 @@ class _LeadChip extends StatelessWidget {
 class _SurfaceCard extends StatelessWidget {
   const _SurfaceCard({
     required this.child,
-    this.backgroundColor,
     this.padding = const EdgeInsets.all(16),
   });
 
   final Widget child;
-  final Color? backgroundColor;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -687,7 +652,7 @@ class _SurfaceCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor ?? theme.colorScheme.surfaceContainer,
+        color: theme.colorScheme.surfaceContainer,
         border: Border.all(color: theme.colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(24),
       ),
@@ -824,10 +789,7 @@ class _ArtworkFallback extends StatelessWidget {
 }
 
 class _SectionEmptyMessage extends StatelessWidget {
-  const _SectionEmptyMessage({
-    required this.title,
-    required this.message,
-  });
+  const _SectionEmptyMessage({required this.title, required this.message});
 
   final String title;
   final String message;

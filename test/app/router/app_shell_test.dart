@@ -6,7 +6,7 @@ import 'package:anime_stream_app/app/router/app_router.dart';
 import 'package:anime_stream_app/app/router/app_shell.dart';
 
 void main() {
-  testWidgets('AppShell switches between Home and Search destinations', (
+  testWidgets('AppShell switches between Home and Browse destinations', (
     tester,
   ) async {
     final router = GoRouter(
@@ -23,9 +23,9 @@ void main() {
                   const Scaffold(body: Center(child: Text('Home Content'))),
             ),
             GoRoute(
-              path: AppRoutePaths.search,
+              path: AppRoutePaths.browse,
               builder: (context, state) =>
-                  const Scaffold(body: Center(child: Text('Search Content'))),
+                  const Scaffold(body: Center(child: Text('Browse Content'))),
             ),
           ],
         ),
@@ -38,15 +38,16 @@ void main() {
 
     expect(find.text('Home Content'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Search'), findsOneWidget);
+    expect(find.text('Browse'), findsOneWidget);
+    expect(find.text('Search'), findsNothing);
 
-    await tester.tap(find.text('Search'));
+    await tester.tap(find.text('Browse'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Search Content'), findsOneWidget);
+    expect(find.text('Browse Content'), findsOneWidget);
     expect(
       router.routeInformationProvider.value.uri.path,
-      AppRoutePaths.search,
+      AppRoutePaths.browse,
     );
   });
 }
