@@ -11,6 +11,7 @@ import '../../domain/models/download_entry.dart';
 import '../../domain/models/episode.dart';
 import '../../domain/models/history_entry.dart';
 import '../../domain/models/watchlist_entry.dart';
+import '../../shared/widgets/anime_cached_artwork.dart';
 
 class MyListsScreen extends ConsumerWidget {
   const MyListsScreen({super.key});
@@ -603,83 +604,17 @@ class _Poster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final trimmedUrl = imageUrl?.trim();
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
         width: 72,
         child: AspectRatio(
           aspectRatio: 2 / 3,
-          child: trimmedUrl == null || trimmedUrl.isEmpty
-              ? _PosterFallback(label: label)
-              : DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHigh,
-                  ),
-                  child: Image.network(
-                    trimmedUrl,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          _PosterFallback(label: label),
-                          const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ],
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) =>
-                        _PosterFallback(label: label),
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PosterFallback extends StatelessWidget {
-  const _PosterFallback({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surfaceContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.movie_creation_outlined,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
+          child: AnimeCachedArtwork(
+            imageUrl: imageUrl,
+            label: label,
+            icon: Icons.movie_creation_outlined,
+          ),
         ),
       ),
     );
