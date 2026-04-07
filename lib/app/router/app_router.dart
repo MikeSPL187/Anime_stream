@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/browse/browse_screen.dart';
 import '../../features/catalog/catalog_screen.dart';
+import '../../features/downloads/downloads_screen.dart';
 import '../../features/history/history_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/my_lists/my_lists_screen.dart';
@@ -74,6 +75,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutePaths.history,
         builder: (context, state) => const HistoryScreen(),
       ),
+      GoRoute(
+        path: AppRoutePaths.downloads,
+        builder: (context, state) => const DownloadsScreen(),
+      ),
     ],
   );
 });
@@ -89,6 +94,7 @@ abstract final class AppRoutePaths {
   static const watchlist = '/watchlist';
   static const catalog = '/catalog';
   static const history = '/history';
+  static const downloads = '/downloads';
 
   static String seriesDetails(String id) => '/series/$id';
 }
