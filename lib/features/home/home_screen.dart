@@ -70,10 +70,10 @@ class _HomeLaunchSurface extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: () async {},
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
           _ContinueWatchingSection(continueWatching: continueWatching),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           if (featuredData.isNotEmpty)
             _FeaturedHero(series: featuredData.first)
           else
@@ -82,7 +82,7 @@ class _HomeLaunchSurface extends StatelessWidget {
               message:
                   'Home will spotlight a launch title when discovery resolves one.',
             ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           _DiscoverySection(
             featuredSeries: featuredData.skip(1).toList(growable: false),
             browseCatalog: browseCatalog,
@@ -129,7 +129,7 @@ class _ContinueWatchingSection extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 228,
+              height: 244,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: entries.length,
@@ -156,103 +156,95 @@ class _ContinueWatchingCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SizedBox(
-      width: 168,
+      width: 176,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _openContinueWatchingEntry(context, item),
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AnimeCachedArtwork(
-                        imageUrl: item.seriesPosterImageUrl,
-                        label: item.seriesTitle,
-                        icon: Icons.movie_creation_outlined,
-                        alignment: Alignment.topCenter,
+          borderRadius: BorderRadius.circular(18),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimeCachedArtwork(
+                  imageUrl: item.seriesPosterImageUrl,
+                  label: item.seriesTitle,
+                  icon: Icons.movie_creation_outlined,
+                  alignment: Alignment.topCenter,
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.04),
+                          Colors.black.withValues(alpha: 0.14),
+                          Colors.black.withValues(alpha: 0.9),
+                        ],
                       ),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.04),
-                                Colors.black.withValues(alpha: 0.08),
-                                Colors.black.withValues(alpha: 0.82),
-                              ],
-                            ),
-                          ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  child: _OverlayPill(
+                    label: item.episodeLabel,
+                    icon: Icons.play_circle_fill_rounded,
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.seriesTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          height: 1.08,
                         ),
                       ),
-                      Positioned(
-                        left: 10,
-                        right: 10,
-                        bottom: 10,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.episodeLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.seriesTitle,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                height: 1.1,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(999),
-                              child: LinearProgressIndicator(
-                                value: item.progressFraction ?? 0,
-                                minHeight: 5,
-                                backgroundColor: Colors.white.withValues(
-                                  alpha: 0.18,
-                                ),
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 5),
+                      Text(
+                        item.episodeTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.88),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: item.progressFraction ?? 0,
+                          minHeight: 5,
+                          backgroundColor: Colors.white.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.progressLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.82),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item.episodeTitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                item.progressLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -279,9 +271,9 @@ class _FeaturedHero extends StatelessWidget {
         const _SectionHeader(title: 'Featured'),
         const SizedBox(height: 10),
         ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           child: SizedBox(
-            height: 286,
+            height: 332,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -298,12 +290,20 @@ class _FeaturedHero extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withValues(alpha: 0.08),
+                          Colors.black.withValues(alpha: 0.05),
                           Colors.black.withValues(alpha: 0.18),
-                          Colors.black.withValues(alpha: 0.88),
+                          Colors.black.withValues(alpha: 0.93),
                         ],
                       ),
                     ),
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  top: 16,
+                  child: _OverlayPill(
+                    label: 'Featured release',
+                    icon: Icons.star_rounded,
                   ),
                 ),
                 Positioned(
@@ -319,22 +319,23 @@ class _FeaturedHero extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.78),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
-                      if (metadata.isNotEmpty) const SizedBox(height: 6),
+                      if (metadata.isNotEmpty) const SizedBox(height: 8),
                       Text(
                         series.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.headlineSmall?.copyWith(
+                        style: theme.textTheme.headlineMedium?.copyWith(
                           color: Colors.white,
-                          height: 1.05,
+                          height: 1.02,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                       if ((series.originalTitle ?? '').trim().isNotEmpty &&
                           series.originalTitle != series.title) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 5),
                         Text(
                           series.originalTitle!,
                           maxLines: 1,
@@ -345,18 +346,18 @@ class _FeaturedHero extends StatelessWidget {
                         ),
                       ],
                       if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Text(
                           series.synopsis!,
-                          maxLines: 2,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            height: 1.25,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            height: 1.28,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 14),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -454,7 +455,7 @@ class _DiscoverySection extends StatelessWidget {
     return Column(
       children: [
         for (var index = 0; index < sections.length; index++) ...[
-          if (index > 0) const SizedBox(height: 24),
+          if (index > 0) const SizedBox(height: 26),
           sections[index],
         ],
       ],
@@ -489,7 +490,7 @@ class _PosterRailSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 228,
+          height: 240,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: seriesList.length,
@@ -518,48 +519,71 @@ class _PosterRailCard extends StatelessWidget {
     ].join(' • ');
 
     return SizedBox(
-      width: 144,
+      width: 150,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _openSeriesDetails(context, series),
-          borderRadius: BorderRadius.circular(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: AspectRatio(
-                    aspectRatio: 2 / 3,
-                    child: AnimeCachedArtwork(
-                      imageUrl: series.posterImageUrl,
-                      label: series.title,
-                      icon: Icons.movie_creation_outlined,
-                      alignment: Alignment.topCenter,
+          borderRadius: BorderRadius.circular(16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimeCachedArtwork(
+                  imageUrl: series.posterImageUrl,
+                  label: series.title,
+                  icon: Icons.movie_creation_outlined,
+                  alignment: Alignment.topCenter,
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.02),
+                          Colors.black.withValues(alpha: 0.1),
+                          Colors.black.withValues(alpha: 0.88),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                series.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall,
-              ),
-              if (metadata.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text(
-                  metadata,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        series.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          height: 1.08,
+                        ),
+                      ),
+                      if (metadata.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          metadata,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.76),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -652,6 +676,40 @@ class _InlineEmptyState extends StatelessWidget {
               message,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
