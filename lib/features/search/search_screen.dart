@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/router/app_router.dart';
 import '../../app/search/search_providers.dart';
 import '../../domain/models/series.dart';
+import '../../shared/widgets/anime_cached_artwork.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -242,9 +243,10 @@ class _TopResultTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     child: AspectRatio(
                       aspectRatio: 2 / 3,
-                      child: _SearchArtwork(
+                      child: AnimeCachedArtwork(
                         imageUrl: series.posterImageUrl,
                         label: series.title,
+                        icon: Icons.movie_creation_outlined,
                       ),
                     ),
                   ),
@@ -340,9 +342,10 @@ class _SearchResultRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 child: AspectRatio(
                   aspectRatio: 2 / 3,
-                  child: _SearchArtwork(
+                  child: AnimeCachedArtwork(
                     imageUrl: series.posterImageUrl,
                     label: series.title,
+                    icon: Icons.movie_creation_outlined,
                   ),
                 ),
               ),
@@ -434,91 +437,6 @@ class _SearchState extends StatelessWidget {
               if (action != null) ...[const SizedBox(height: 16), action!],
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchArtwork extends StatelessWidget {
-  const _SearchArtwork({required this.imageUrl, required this.label});
-
-  final String? imageUrl;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final trimmedUrl = imageUrl?.trim();
-
-    if (trimmedUrl == null || trimmedUrl.isEmpty) {
-      return _SearchArtworkFallback(label: label);
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHigh),
-      child: Image.network(
-        trimmedUrl,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            return child;
-          }
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              _SearchArtworkFallback(label: label),
-              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ],
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _SearchArtworkFallback(label: label);
-        },
-      ),
-    );
-  }
-}
-
-class _SearchArtworkFallback extends StatelessWidget {
-  const _SearchArtworkFallback({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surfaceContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.movie_creation_outlined,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
         ),
       ),
     );
