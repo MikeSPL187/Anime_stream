@@ -92,10 +92,11 @@ class _BrowseContent extends StatelessWidget {
             child: TabBar(
               isScrollable: true,
               tabAlignment: TabAlignment.start,
+              dividerColor: Colors.transparent,
               tabs: [for (final section in sections) Tab(text: section.title)],
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Expanded(
             child: TabBarView(
               children: [
@@ -126,14 +127,15 @@ class _BrowseSpotlight extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final metadata = <String>[
+      section.title,
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
     ].join(' • ');
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(22),
       child: SizedBox(
-        height: 196,
+        height: 252,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -150,60 +152,93 @@ class _BrowseSpotlight extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.06),
+                      Colors.black.withValues(alpha: 0.05),
                       Colors.black.withValues(alpha: 0.16),
-                      Colors.black.withValues(alpha: 0.84),
+                      Colors.black.withValues(alpha: 0.9),
                     ],
                   ),
                 ),
               ),
             ),
             Positioned(
-              left: 14,
-              right: 14,
-              bottom: 14,
+              left: 16,
+              top: 16,
+              child: _OverlayPill(
+                label: section.title,
+                icon: Icons.explore_rounded,
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    section.title.toUpperCase(),
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    series.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (metadata.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                  if (metadata.isNotEmpty)
                     Text(
                       metadata,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.78),
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  if (metadata.isNotEmpty) const SizedBox(height: 8),
+                  Text(
+                    series.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      height: 1.03,
+                    ),
+                  ),
+                  if ((series.originalTitle ?? '').trim().isNotEmpty &&
+                      series.originalTitle != series.title) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      series.originalTitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.82),
                       ),
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: () =>
-                        context.push(AppRoutePaths.seriesDetails(series.id)),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      minimumSize: Size.zero,
+                  if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      series.synopsis!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        height: 1.24,
+                      ),
                     ),
-                    icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                    label: const Text('Open series'),
+                  ],
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () => context.push(
+                          AppRoutePaths.seriesDetails(series.id),
+                        ),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Open series'),
+                      ),
+                      TextButton(
+                        onPressed: () => context.push(AppRoutePaths.catalog),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Open catalog'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -242,13 +277,13 @@ class _BrowseSectionView extends StatelessWidget {
             : 2;
 
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
           itemCount: section.seriesList.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             crossAxisSpacing: 12,
             mainAxisSpacing: 14,
-            childAspectRatio: 0.60,
+            childAspectRatio: 0.68,
           ),
           itemBuilder: (context, index) {
             return _BrowsePosterTile(series: section.seriesList[index]);
@@ -276,42 +311,66 @@ class _BrowsePosterTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: AspectRatio(
-                  aspectRatio: 2 / 3,
-                  child: AnimeCachedArtwork(
-                    imageUrl: series.posterImageUrl,
-                    label: series.title,
-                    icon: Icons.movie_creation_outlined,
+        borderRadius: BorderRadius.circular(16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              AnimeCachedArtwork(
+                imageUrl: series.posterImageUrl,
+                label: series.title,
+                icon: Icons.movie_creation_outlined,
+                alignment: Alignment.topCenter,
+              ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.02),
+                        Colors.black.withValues(alpha: 0.1),
+                        Colors.black.withValues(alpha: 0.9),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              series.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleMedium,
-            ),
-            if (metadata.isNotEmpty) ...[
-              const SizedBox(height: 3),
-              Text(
-                metadata,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      series.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        height: 1.08,
+                      ),
+                    ),
+                    if (metadata.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        metadata,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.76),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -358,6 +417,40 @@ class _BrowseMessageState extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );
