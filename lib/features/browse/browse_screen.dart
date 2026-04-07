@@ -35,10 +35,15 @@ class BrowseScreen extends ConsumerWidget {
         ],
       ),
       body: browseCatalog.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const _BrowseMessageState(
+          title: 'Loading browse',
+          message: 'Discovery slices are being prepared.',
+          icon: Icons.explore_outlined,
+        ),
         error: (error, stackTrace) => _BrowseMessageState(
           title: 'Browse unavailable',
           message: 'Catalog browse data could not be loaded.\n$error',
+          icon: Icons.error_outline_rounded,
         ),
         data: (catalog) => _BrowseContent(catalog: catalog),
       ),
@@ -63,6 +68,7 @@ class _BrowseContent extends StatelessWidget {
       return const _BrowseMessageState(
         title: 'Nothing surfaced yet',
         message: 'No browse slices are available right now.',
+        icon: Icons.explore_outlined,
       );
     }
 
@@ -79,15 +85,16 @@ class _BrowseContent extends StatelessWidget {
                 series: spotlight.seriesList.first,
               ),
             ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TabBar(
               isScrollable: true,
+              tabAlignment: TabAlignment.start,
               tabs: [for (final section in sections) Tab(text: section.title)],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Expanded(
             child: TabBarView(
               children: [
@@ -120,12 +127,12 @@ class _BrowseSpotlight extends StatelessWidget {
     final metadata = <String>[
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
-    ].join('  •  ');
+    ].join(' • ');
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        height: 232,
+        height: 196,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -142,18 +149,18 @@ class _BrowseSpotlight extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.08),
-                      Colors.black.withValues(alpha: 0.18),
-                      Colors.black.withValues(alpha: 0.86),
+                      Colors.black.withValues(alpha: 0.06),
+                      Colors.black.withValues(alpha: 0.16),
+                      Colors.black.withValues(alpha: 0.84),
                     ],
                   ),
                 ),
               ),
             ),
             Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
+              left: 14,
+              right: 14,
+              bottom: 14,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -163,17 +170,18 @@ class _BrowseSpotlight extends StatelessWidget {
                       color: theme.colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     series.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.headlineSmall?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       color: Colors.white,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (metadata.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       metadata,
                       maxLines: 1,
@@ -183,11 +191,18 @@ class _BrowseSpotlight extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 10),
-                  FilledButton(
+                  const SizedBox(height: 8),
+                  TextButton.icon(
                     onPressed: () =>
                         context.push(AppRoutePaths.seriesDetails(series.id)),
-                    child: const Text('Open Series'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: Size.zero,
+                    ),
+                    icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                    label: const Text('Open series'),
                   ),
                 ],
               ),
@@ -210,6 +225,7 @@ class _BrowseSectionView extends StatelessWidget {
       return _BrowseMessageState(
         title: '${section.title} unavailable',
         message: 'No anime is currently available in this slice.',
+        icon: Icons.explore_outlined,
       );
     }
 
@@ -230,8 +246,8 @@ class _BrowseSectionView extends StatelessWidget {
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             crossAxisSpacing: 12,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.56,
+            mainAxisSpacing: 14,
+            childAspectRatio: 0.60,
           ),
           itemBuilder: (context, index) {
             return _BrowsePosterTile(series: section.seriesList[index]);
@@ -276,7 +292,7 @@ class _BrowsePosterTile extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               series.title,
               maxLines: 2,
@@ -284,7 +300,7 @@ class _BrowsePosterTile extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
             if (metadata.isNotEmpty) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 metadata,
                 maxLines: 1,
@@ -393,10 +409,15 @@ class _ArtworkFallback extends StatelessWidget {
 }
 
 class _BrowseMessageState extends StatelessWidget {
-  const _BrowseMessageState({required this.title, required this.message});
+  const _BrowseMessageState({
+    required this.title,
+    required this.message,
+    required this.icon,
+  });
 
   final String title;
   final String message;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -410,11 +431,7 @@ class _BrowseMessageState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.explore_outlined,
-                color: theme.colorScheme.primary,
-                size: 36,
-              ),
+              Icon(icon, color: theme.colorScheme.primary, size: 36),
               const SizedBox(height: 16),
               Text(
                 title,
