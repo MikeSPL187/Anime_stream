@@ -803,27 +803,26 @@ class _EpisodeRow extends ConsumerWidget {
               ),
         child: Container(
           color: backgroundColor,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 48,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'EP',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 122,
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: AnimeCachedArtwork(
+                      imageUrl:
+                          episode.thumbnailImageUrl ?? series.posterImageUrl,
+                      label: episode.title.trim().isEmpty
+                          ? 'Episode ${episode.numberLabel}'
+                          : episode.title,
+                      icon: Icons.movie_creation_outlined,
+                      alignment: Alignment.topCenter,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      episode.numberLabel,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -831,18 +830,32 @@ class _EpisodeRow extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (actionHint != null)
-                      Text(
-                        actionHint!.label,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color:
-                              actionHint!.tone ==
-                                  _EpisodeActionHintTone.secondary
-                              ? theme.colorScheme.secondary
-                              : theme.colorScheme.primary,
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          'EP ${episode.numberLabel}',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    if (actionHint != null) const SizedBox(height: 4),
+                        if (actionHint != null)
+                          Text(
+                            actionHint!.label,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color:
+                                  actionHint!.tone ==
+                                      _EpisodeActionHintTone.secondary
+                                  ? theme.colorScheme.secondary
+                                  : theme.colorScheme.primary,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       episode.title.trim().isEmpty
                           ? 'Episode ${episode.numberLabel}'
@@ -852,6 +865,8 @@ class _EpisodeRow extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       statusParts.join(' • '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
