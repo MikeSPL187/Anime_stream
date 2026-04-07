@@ -14,8 +14,15 @@ import '../../app/router/app_router.dart';
 import 'player_screen_context.dart';
 
 const _playerAccent = Color(0xFFFF7A00);
-const _playerOutline = Color(0x1FFFFFFF);
-const _playerOverlaySurface = Color(0x660D0D0D);
+const _playerOutline = Color(0x14FFFFFF);
+const _playerOverlaySurface = Color(0x520B0B0B);
+const _playerBackdrop = BoxDecoration(
+  gradient: LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Colors.black, Color(0xFF080808)],
+  ),
+);
 
 class PlayerScreen extends ConsumerWidget {
   const PlayerScreen({super.key, this.sessionContext});
@@ -253,18 +260,13 @@ class _PlayerResolutionStage extends StatelessWidget {
       streamHost: null,
       statusText: 'Player is preparing this stream.',
       statusLabel: 'Opening',
+      primaryActionIcon: Icons.arrow_back_rounded,
       primaryActionLabel: 'Back',
       onPrimaryAction: onBackRequested,
     );
 
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.black, Color(0xFF080808)],
-        ),
-      ),
+      decoration: _playerBackdrop,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -305,6 +307,7 @@ class _PlayerResolutionStage extends StatelessWidget {
                       streamHost: null,
                       statusLabel: 'Opening',
                       statusText: 'Player is preparing this stream.',
+                      primaryActionIcon: Icons.arrow_back_rounded,
                       primaryActionLabel: 'Back',
                       onPrimaryAction: onBackRequested,
                     ),
@@ -936,6 +939,9 @@ class _ResolvedPlaybackSurfaceState
         onInteractionStart: _showControls,
         onInteractionEnd: _scheduleControlsAutoHide,
       ),
+      primaryActionIcon: widget.canToggleFullscreen && !widget.isFullscreen
+          ? Icons.fullscreen_rounded
+          : Icons.menu_book_rounded,
       primaryActionLabel: widget.canToggleFullscreen && !widget.isFullscreen
           ? 'Enter Fullscreen'
           : 'Open Series',
@@ -944,6 +950,9 @@ class _ResolvedPlaybackSurfaceState
           : () async {
               _openSeriesHub();
             },
+      secondaryActionIcon: widget.canToggleFullscreen && !widget.isFullscreen
+          ? Icons.menu_book_rounded
+          : null,
       secondaryActionLabel: widget.canToggleFullscreen && !widget.isFullscreen
           ? 'Open Series'
           : null,
@@ -952,17 +961,9 @@ class _ResolvedPlaybackSurfaceState
           : null,
     );
 
-    const playerBackdrop = BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Colors.black, Color(0xFF080808)],
-      ),
-    );
-
     if (showHandsetCompanion) {
       return DecoratedBox(
-        decoration: playerBackdrop,
+        decoration: _playerBackdrop,
         child: SafeArea(
           bottom: false,
           child: Column(
@@ -971,10 +972,10 @@ class _ResolvedPlaybackSurfaceState
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
-                    14,
-                    14,
-                    14,
-                    MediaQuery.paddingOf(context).bottom + 14,
+                    12,
+                    8,
+                    12,
+                    MediaQuery.paddingOf(context).bottom + 12,
                   ),
                   child: _CompactSessionSummary(
                     sessionContext: widget.sessionContext,
@@ -982,6 +983,10 @@ class _ResolvedPlaybackSurfaceState
                     streamHost: streamHost,
                     statusLabel: _statusLabel(),
                     statusText: _statusMessage(),
+                    primaryActionIcon:
+                        widget.canToggleFullscreen && !widget.isFullscreen
+                        ? Icons.fullscreen_rounded
+                        : Icons.menu_book_rounded,
                     primaryActionLabel:
                         widget.canToggleFullscreen && !widget.isFullscreen
                         ? 'Enter Fullscreen'
@@ -992,6 +997,10 @@ class _ResolvedPlaybackSurfaceState
                         : () async {
                             _openSeriesHub();
                           },
+                    secondaryActionIcon:
+                        widget.canToggleFullscreen && !widget.isFullscreen
+                        ? Icons.menu_book_rounded
+                        : null,
                     secondaryActionLabel:
                         widget.canToggleFullscreen && !widget.isFullscreen
                         ? 'Open Series'
@@ -1010,11 +1019,11 @@ class _ResolvedPlaybackSurfaceState
     }
 
     if (isHandset) {
-      return DecoratedBox(decoration: playerBackdrop, child: stage);
+      return DecoratedBox(decoration: _playerBackdrop, child: stage);
     }
 
     return DecoratedBox(
-      decoration: playerBackdrop,
+      decoration: _playerBackdrop,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -1110,6 +1119,7 @@ class _PlaybackStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveControlsVisible =
         controlsVisible || !isPlaying || isBuffering || isCompleted;
+    final theme = Theme.of(context);
     final playbackStateLabel = isCompleted
         ? 'Complete'
         : isBuffering
@@ -1117,6 +1127,7 @@ class _PlaybackStage extends StatelessWidget {
         : isPlaying
         ? 'Playing'
         : 'Paused';
+    final stageLabel = '$qualityLabel • ${sessionContext.episodeDisplayLabel}';
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -1147,9 +1158,9 @@ class _PlaybackStage extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
+                      Color(0xB8000000),
+                      Color(0x05000000),
                       Color(0xCC000000),
-                      Color(0x15000000),
-                      Color(0xD9000000),
                     ],
                   ),
                 ),
@@ -1158,148 +1169,134 @@ class _PlaybackStage extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                     child: Column(
                       children: [
-                        _PlayerGlassPanel(
-                          backgroundColor: const Color(0x56111111),
-                          padding: const EdgeInsets.all(8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _OverlayIconButton(
-                                icon: Icons.arrow_back_rounded,
-                                onPressed: onBackRequested,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      sessionContext.seriesTitle,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _OverlayIconButton(
+                              icon: Icons.arrow_back_rounded,
+                              onPressed: onBackRequested,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _OverlayPill(
+                                    label: playbackStateLabel,
+                                    color: _playerAccent,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    sessionContext.seriesTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    sessionContext.episodeTitle,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.white70,
+                                      height: 1.2,
                                     ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      '${sessionContext.episodeDisplayLabel} • ${sessionContext.episodeTitle}',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Colors.white70,
-                                            height: 1.2,
-                                          ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _OverlayIconButton(
+                              icon: Icons.menu_book_rounded,
+                              onPressed: () async => onOpenSeriesRequested(),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 760),
+                          child: _PlayerGlassPanel(
+                            backgroundColor: const Color(0x40101010),
+                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        stageLabel,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(color: Colors.white70),
+                                      ),
+                                    ),
+                                    if (canToggleFullscreen) ...[
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        onPressed: () {
+                                          unawaited(onToggleFullscreen());
+                                        },
+                                        icon: Icon(
+                                          isFullscreen
+                                              ? Icons.fullscreen_exit_rounded
+                                              : Icons.fullscreen_rounded,
+                                          color: Colors.white,
+                                        ),
+                                        tooltip: isFullscreen
+                                            ? 'Exit Fullscreen'
+                                            : 'Enter Fullscreen',
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _OverlayTransportButton(
+                                      icon: Icons.replay_10_rounded,
+                                      onPressed: () async {
+                                        await onSeekBackward();
+                                      },
+                                    ),
+                                    const SizedBox(width: 18),
+                                    _OverlayTransportButton(
+                                      icon: isCompleted
+                                          ? Icons.replay_rounded
+                                          : isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      isPrimary: true,
+                                      onPressed: () async {
+                                        await onPrimaryAction();
+                                      },
+                                    ),
+                                    const SizedBox(width: 18),
+                                    _OverlayTransportButton(
+                                      icon: Icons.forward_10_rounded,
+                                      onPressed: () async {
+                                        await onSeekForward();
+                                      },
                                     ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              _OverlayIconButton(
-                                icon: Icons.menu_book_rounded,
-                                onPressed: () async => onOpenSeriesRequested(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        _PlayerGlassPanel(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 12,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _OverlayTransportButton(
-                                icon: Icons.replay_10_rounded,
-                                onPressed: () async {
-                                  await onSeekBackward();
-                                },
-                              ),
-                              const SizedBox(width: 16),
-                              _OverlayTransportButton(
-                                icon: isCompleted
-                                    ? Icons.replay_rounded
-                                    : isPlaying
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                isPrimary: true,
-                                onPressed: () async {
-                                  await onPrimaryAction();
-                                },
-                              ),
-                              const SizedBox(width: 16),
-                              _OverlayTransportButton(
-                                icon: Icons.forward_10_rounded,
-                                onPressed: () async {
-                                  await onSeekForward();
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        _PlayerGlassPanel(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _PlaybackTimeline(
-                                player: player,
-                                textColor: Colors.white,
-                                inactiveColor: Colors.white24,
-                                onInteractionStart: onTimelineInteractionStart,
-                                onInteractionEnd: onTimelineInteractionEnd,
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '${sessionContext.episodeDisplayLabel} • $qualityLabel',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(color: Colors.white70),
-                                    ),
-                                  ),
-                                  Text(
-                                    playbackStateLabel,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelLarge
-                                        ?.copyWith(color: _playerAccent),
-                                  ),
-                                  if (canToggleFullscreen) ...[
-                                    const SizedBox(width: 10),
-                                    IconButton(
-                                      onPressed: () {
-                                        unawaited(onToggleFullscreen());
-                                      },
-                                      icon: Icon(
-                                        isFullscreen
-                                            ? Icons.fullscreen_exit_rounded
-                                            : Icons.fullscreen_rounded,
-                                        color: Colors.white,
-                                      ),
-                                      tooltip: isFullscreen
-                                          ? 'Exit Fullscreen'
-                                          : 'Enter Fullscreen',
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
+                                const SizedBox(height: 10),
+                                _PlaybackTimeline(
+                                  player: player,
+                                  textColor: Colors.white,
+                                  inactiveColor: Colors.white24,
+                                  onInteractionStart:
+                                      onTimelineInteractionStart,
+                                  onInteractionEnd: onTimelineInteractionEnd,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1322,9 +1319,11 @@ class _SessionSummaryPanel extends StatelessWidget {
     required this.streamHost,
     required this.statusText,
     required this.statusLabel,
+    required this.primaryActionIcon,
     required this.primaryActionLabel,
     required this.onPrimaryAction,
     this.timeline,
+    this.secondaryActionIcon,
     this.secondaryActionLabel,
     this.onSecondaryAction,
   });
@@ -1335,8 +1334,10 @@ class _SessionSummaryPanel extends StatelessWidget {
   final String statusText;
   final String statusLabel;
   final Widget? timeline;
+  final IconData primaryActionIcon;
   final String primaryActionLabel;
   final Future<void> Function() onPrimaryAction;
+  final IconData? secondaryActionIcon;
   final String? secondaryActionLabel;
   final VoidCallback? onSecondaryAction;
 
@@ -1345,15 +1346,24 @@ class _SessionSummaryPanel extends StatelessWidget {
     final theme = Theme.of(context);
 
     return _PlayerGlassPanel(
-      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.98),
-      padding: const EdgeInsets.all(18),
+      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.95),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
+            'Now playing',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
             sessionContext.seriesTitle,
             style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
@@ -1399,26 +1409,28 @@ class _SessionSummaryPanel extends StatelessWidget {
             ),
           ],
           if (timeline != null) ...[const SizedBox(height: 14), timeline!],
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {
-                unawaited(onPrimaryAction());
-              },
-              child: Text(primaryActionLabel),
-            ),
-          ),
-          if (secondaryActionLabel != null && onSecondaryAction != null) ...[
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: onSecondaryAction,
-                child: Text(secondaryActionLabel!),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: () {
+                  unawaited(onPrimaryAction());
+                },
+                icon: Icon(primaryActionIcon),
+                label: Text(primaryActionLabel),
               ),
-            ),
-          ],
+              if (secondaryActionLabel != null && onSecondaryAction != null)
+                TextButton.icon(
+                  onPressed: onSecondaryAction,
+                  icon: Icon(
+                    secondaryActionIcon ?? Icons.arrow_forward_rounded,
+                  ),
+                  label: Text(secondaryActionLabel!),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -1432,8 +1444,10 @@ class _CompactSessionSummary extends StatelessWidget {
     required this.streamHost,
     required this.statusLabel,
     required this.statusText,
+    required this.primaryActionIcon,
     required this.primaryActionLabel,
     required this.onPrimaryAction,
+    this.secondaryActionIcon,
     this.secondaryActionLabel,
     this.onSecondaryAction,
   });
@@ -1443,8 +1457,10 @@ class _CompactSessionSummary extends StatelessWidget {
   final String? streamHost;
   final String statusLabel;
   final String statusText;
+  final IconData primaryActionIcon;
   final String primaryActionLabel;
   final Future<void> Function() onPrimaryAction;
+  final IconData? secondaryActionIcon;
   final String? secondaryActionLabel;
   final VoidCallback? onSecondaryAction;
 
@@ -1462,15 +1478,32 @@ class _CompactSessionSummary extends StatelessWidget {
     ].join(' • ');
 
     return _PlayerGlassPanel(
-      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.96),
-      padding: const EdgeInsets.all(14),
+      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.94),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _HeaderChip(
+                label: sessionContext.episodeDisplayLabel,
+                color: theme.colorScheme.primary,
+              ),
+              if (qualityLabel != null)
+                _HeaderChip(
+                  label: qualityLabel!,
+                  color: theme.colorScheme.secondary,
+                ),
+              _HeaderChip(label: statusLabel, color: theme.colorScheme.primary),
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
             sessionContext.seriesTitle,
             style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 4),
@@ -1483,7 +1516,7 @@ class _CompactSessionSummary extends StatelessWidget {
             ),
           ),
           if (details.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               details,
               maxLines: 1,
@@ -1495,14 +1528,6 @@ class _CompactSessionSummary extends StatelessWidget {
           ],
           const SizedBox(height: 6),
           Text(
-            statusLabel,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: _playerAccent,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
             statusText,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1511,25 +1536,27 @@ class _CompactSessionSummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {
-                unawaited(onPrimaryAction());
-              },
-              child: Text(primaryActionLabel),
-            ),
-          ),
-          if (secondaryActionLabel != null && onSecondaryAction != null) ...[
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: onSecondaryAction,
-                child: Text(secondaryActionLabel!),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: () {
+                  unawaited(onPrimaryAction());
+                },
+                icon: Icon(primaryActionIcon),
+                label: Text(primaryActionLabel),
               ),
-            ),
-          ],
+              if (secondaryActionLabel != null && onSecondaryAction != null)
+                TextButton.icon(
+                  onPressed: onSecondaryAction,
+                  icon: Icon(
+                    secondaryActionIcon ?? Icons.arrow_forward_rounded,
+                  ),
+                  label: Text(secondaryActionLabel!),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -1664,16 +1691,16 @@ class _StageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(26),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.black,
           border: Border.all(color: _playerOutline),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x44000000),
-              blurRadius: 22,
-              offset: Offset(0, 14),
+              color: Color(0x3A000000),
+              blurRadius: 30,
+              offset: Offset(0, 18),
             ),
           ],
         ),
@@ -1698,11 +1725,11 @@ class _StageContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: 380),
           child: _PlayerGlassPanel(
-            backgroundColor: _playerOverlaySurface,
+            backgroundColor: const Color(0x46101010),
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1721,7 +1748,7 @@ class _StageContent extends StatelessWidget {
                 Text(
                   message,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white70,
+                    color: Colors.white.withValues(alpha: 0.8),
                     height: 1.3,
                   ),
                   textAlign: TextAlign.center,
@@ -1751,13 +1778,13 @@ class _PlayerGlassPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: backgroundColor ?? _playerOverlaySurface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _playerOutline),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x29000000),
-            blurRadius: 14,
-            offset: Offset(0, 8),
+            color: Color(0x26000000),
+            blurRadius: 18,
+            offset: Offset(0, 10),
           ),
         ],
       ),
@@ -1779,9 +1806,9 @@ class _PlayerStateIcon extends StatelessWidget {
       height: 62,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: Colors.white.withValues(alpha: 0.06),
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: child ?? Icon(icon, color: Colors.white, size: 30),
     );
@@ -1815,9 +1842,9 @@ class _OverlayIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: Colors.white.withValues(alpha: 0.06),
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: SizedBox(
         width: 42,
@@ -1856,12 +1883,12 @@ class _OverlayTransportButton extends StatelessWidget {
                 end: Alignment.bottomCenter,
               )
             : null,
-        color: isPrimary ? null : Colors.white.withValues(alpha: 0.08),
+        color: isPrimary ? null : Colors.white.withValues(alpha: 0.06),
         shape: BoxShape.circle,
         border: Border.all(
           color: isPrimary
               ? Colors.transparent
-              : Colors.white.withValues(alpha: 0.12),
+              : Colors.white.withValues(alpha: 0.08),
         ),
         boxShadow: isPrimary
             ? const [
@@ -1884,6 +1911,34 @@ class _OverlayTransportButton extends StatelessWidget {
             icon,
             color: isPrimary ? Colors.black : Colors.white,
             size: isPrimary ? 30 : 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.34)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
