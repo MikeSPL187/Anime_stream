@@ -3,8 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:anime_stream_app/app/player/player_playback_providers.dart';
 import 'package:anime_stream_app/data/adapters/anilibria/anilibria_remote_data_source.dart';
 import 'package:anime_stream_app/data/dto/anilibria/anilibria_episode_dto.dart';
-import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_page_dto.dart';
 import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_dto.dart';
+import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_page_dto.dart';
+import 'package:anime_stream_app/domain/models/download_entry.dart';
+import 'package:anime_stream_app/domain/repositories/downloads_repository.dart';
 import 'package:anime_stream_app/features/player/player_screen_context.dart';
 
 void main() {
@@ -13,9 +15,9 @@ void main() {
       'resolves playback from shared release details by episode id',
       () async {
         final remoteDataSource = _FakeAnilibriaRemoteDataSource(
-          release: AnilibriaReleaseDto(
+          release: const AnilibriaReleaseDto(
             id: 'series-501',
-            episodes: const [
+            episodes: [
               AnilibriaEpisodeDto(
                 id: 'episode-7',
                 releaseId: 'series-501',
@@ -30,6 +32,7 @@ void main() {
         );
         final resolver = PlayerPlaybackResolver(
           remoteDataSource: remoteDataSource,
+          downloadsRepository: const _NoOpDownloadsRepository(),
         );
 
         final source = await resolver.resolve(
@@ -51,9 +54,9 @@ void main() {
     test('matches by episode number label when ids differ', () async {
       final resolver = PlayerPlaybackResolver(
         remoteDataSource: _FakeAnilibriaRemoteDataSource(
-          release: AnilibriaReleaseDto(
+          release: const AnilibriaReleaseDto(
             id: 'series-42',
-            episodes: const [
+            episodes: [
               AnilibriaEpisodeDto(
                 id: 'provider-episode-2-5',
                 releaseId: 'series-42',
@@ -65,6 +68,7 @@ void main() {
             ],
           ),
         ),
+        downloadsRepository: const _NoOpDownloadsRepository(),
       );
 
       final source = await resolver.resolve(
@@ -86,9 +90,9 @@ void main() {
       () async {
         final resolver = PlayerPlaybackResolver(
           remoteDataSource: _FakeAnilibriaRemoteDataSource(
-            release: AnilibriaReleaseDto(
+            release: const AnilibriaReleaseDto(
               id: 'series-12',
-              episodes: const [
+              episodes: [
                 AnilibriaEpisodeDto(
                   id: 'episode-1',
                   releaseId: 'series-12',
@@ -99,6 +103,7 @@ void main() {
               ],
             ),
           ),
+          downloadsRepository: const _NoOpDownloadsRepository(),
         );
 
         await expectLater(
@@ -122,6 +127,41 @@ void main() {
       },
     );
   });
+}
+
+class _NoOpDownloadsRepository implements DownloadsRepository {
+  const _NoOpDownloadsRepository();
+
+  @override
+  Future<List<DownloadEntry>> getDownloads() async => const [];
+
+  @override
+  Future<DownloadEntry?> getPlayableDownload({
+    required String seriesId,
+    required String episodeId,
+  }) async => null;
+
+  @override
+  Future<void> pauseDownload(String downloadId) async {}
+
+  @override
+  Future<void> queueEpisodeDownload({
+    required String seriesId,
+    required String episodeId,
+    String selectedQuality = '1080p',
+  }) async {}
+
+  @override
+  Future<DownloadEntry> startEpisodeDownload({
+    required String seriesId,
+    required String episodeId,
+    String selectedQuality = '1080p',
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> removeDownload(String downloadId) async {}
 }
 
 class _FakeAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {

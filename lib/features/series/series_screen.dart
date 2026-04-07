@@ -1,13 +1,14 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/downloads/downloads_providers.dart';
 import '../../app/router/app_router.dart';
 import '../../app/series/series_details_data.dart';
 import '../../app/series/series_providers.dart';
 import '../../app/watch/watch_state_operation_providers.dart';
 import '../../app/watchlist/watchlist_providers.dart';
+import '../../domain/models/download_entry.dart';
 import '../../domain/models/episode.dart';
 import '../../domain/models/episode_progress.dart';
 import '../../domain/models/series.dart';
@@ -590,7 +591,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
                 _EpisodesSectionLead(
                   message: sectionSubtitle,
                   actionLabel:
-                      'Tap an episode to open playback. Use filters and ordering to manage the watch flow without leaving the series hub.',
+                      'Tap an episode to open playback. Use filters, ordering, watch-state and offline actions without leaving the series hub.',
                 ),
                 const SizedBox(height: 16),
                 _EpisodeBrowserControls(
@@ -849,13 +850,37 @@ class _EpisodeRow extends ConsumerWidget {
       _EpisodeActionHintTone.primary => theme.colorScheme.primary,
       null => null,
     };
+
+    final downloadKey = EpisodeDownloadKey(
+      seriesId: series.id,
+      episodeId: episode.id,
+    );
+    final downloadEntryAsync = ref.watch(
+      episodeDownloadEntryProvider(downloadKey),
+    );
+    final downloadActionState = ref.watch(
+      episodeDownloadActionControllerProvider(downloadKey),
+    );
+    final downloadEntry = downloadEntryAsync.asData?.value;
+    final isMutatingDownload = downloadActionState.isLoading;
     final watchStateOperation = ref.watch(
       seriesWatchStateOperationsControllerProvider(series.id),
     );
     final isMutatingWatchState = watchStateOperation.isLoading;
+    final isBusy = isMutatingDownload || isMutatingWatchState;
+
     final watchedMenuAction = savedProgress?.isCompleted == true
         ? _EpisodeRowMenuAction.markUnwatched
         : _EpisodeRowMenuAction.markWatched;
+    final downloadMenuAction = switch (downloadEntry?.status) {
+      DownloadStatus.completed => _EpisodeRowMenuAction.removeDownload,
+      DownloadStatus.failed => _EpisodeRowMenuAction.retryDownload,
+      DownloadStatus.paused => _EpisodeRowMenuAction.retryDownload,
+      DownloadStatus.downloading => _EpisodeRowMenuAction.downloadInProgress,
+      DownloadStatus.queued => _EpisodeRowMenuAction.downloadInProgress,
+      null => _EpisodeRowMenuAction.downloadEpisode,
+    };
+    final downloadStatusPill = _downloadStatusPill(theme, downloadEntry);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -875,7 +900,7 @@ class _EpisodeRow extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: isMutatingWatchState
+          onTap: isBusy
               ? null
               : () {
                   _openEpisodeInPlayer(context, series: series, episode: episode);
@@ -912,6 +937,7 @@ class _EpisodeRow extends ConsumerWidget {
                               label: watchStatus.label,
                               color: watchStatus.color,
                             ),
+                    ?downloadStatusPill,
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -960,15 +986,23 @@ class _EpisodeRow extends ConsumerWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           FilledButton.tonalIcon(
-                            onPressed: isMutatingWatchState
+                            onPressed: isBusy
                                 ? null
                                 : () => _openEpisodeInPlayer(
                                       context,
                                       series: series,
                                       episode: episode,
                                     ),
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: const Text('Play episode'),
+                            icon: Icon(
+                              downloadEntry?.isPlayableOffline == true
+                                  ? Icons.offline_pin_rounded
+                                  : Icons.play_arrow_rounded,
+                            ),
+                            label: Text(
+                              downloadEntry?.isPlayableOffline == true
+                                  ? 'Play offline'
+                                  : 'Play episode',
+                            ),
                           ),
                           if (savedProgress?.isCompleted == true)
                             _EpisodeInfoPill(
@@ -987,15 +1021,27 @@ class _EpisodeRow extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 PopupMenuButton<_EpisodeRowMenuAction>(
-                  enabled: !isMutatingWatchState,
+                  enabled: !isBusy,
                   tooltip: 'Episode actions',
                   onSelected: (action) async {
-                    await _handleEpisodeMenuAction(context, ref, action);
+                    await _handleEpisodeMenuAction(
+                      context,
+                      ref,
+                      action,
+                      downloadKey: downloadKey,
+                      downloadEntry: downloadEntry,
+                    );
                   },
                   itemBuilder: (context) => [
                     const PopupMenuItem<_EpisodeRowMenuAction>(
                       value: _EpisodeRowMenuAction.play,
                       child: Text('Play episode'),
+                    ),
+                    PopupMenuItem<_EpisodeRowMenuAction>(
+                      value: downloadMenuAction,
+                      enabled: downloadMenuAction !=
+                          _EpisodeRowMenuAction.downloadInProgress,
+                      child: Text(downloadMenuAction.label),
                     ),
                     const PopupMenuDivider(),
                     PopupMenuItem<_EpisodeRowMenuAction>(
@@ -1003,7 +1049,7 @@ class _EpisodeRow extends ConsumerWidget {
                       child: Text(watchedMenuAction.label),
                     ),
                   ],
-                  icon: isMutatingWatchState
+                  icon: isBusy
                       ? const SizedBox(
                           width: 20,
                           height: 20,
@@ -1022,29 +1068,72 @@ class _EpisodeRow extends ConsumerWidget {
     );
   }
 
+  Widget? _downloadStatusPill(ThemeData theme, DownloadEntry? entry) {
+    return switch (entry?.status) {
+      DownloadStatus.completed => _EpisodeWatchStatus(
+          label: 'Available offline',
+          color: theme.colorScheme.primary,
+        ),
+      DownloadStatus.downloading => _EpisodeWatchStatus(
+          label: 'Downloading',
+          color: theme.colorScheme.secondary,
+        ),
+      DownloadStatus.queued => _EpisodeWatchStatus(
+          label: 'Queued',
+          color: theme.colorScheme.secondary,
+        ),
+      DownloadStatus.failed => _EpisodeWatchStatus(
+          label: 'Download failed',
+          color: theme.colorScheme.error,
+        ),
+      DownloadStatus.paused => _EpisodeWatchStatus(
+          label: 'Download paused',
+          color: theme.colorScheme.tertiary,
+        ),
+      null => null,
+    };
+  }
+
   Future<void> _handleEpisodeMenuAction(
     BuildContext context,
     WidgetRef ref,
-    _EpisodeRowMenuAction action,
-  ) async {
+    _EpisodeRowMenuAction action, {
+    required EpisodeDownloadKey downloadKey,
+    required DownloadEntry? downloadEntry,
+  }) async {
     if (action == _EpisodeRowMenuAction.play) {
       _openEpisodeInPlayer(context, series: series, episode: episode);
       return;
     }
 
-    final controller = ref.read(
+    final watchController = ref.read(
       seriesWatchStateOperationsControllerProvider(series.id).notifier,
+    );
+    final downloadController = ref.read(
+      episodeDownloadActionControllerProvider(downloadKey).notifier,
     );
 
     try {
       switch (action) {
         case _EpisodeRowMenuAction.play:
+        case _EpisodeRowMenuAction.downloadInProgress:
           return;
         case _EpisodeRowMenuAction.markWatched:
-          await controller.markEpisodeWatched(episode.id);
+          await watchController.markEpisodeWatched(episode.id);
           break;
         case _EpisodeRowMenuAction.markUnwatched:
-          await controller.markEpisodeUnwatched(episode.id);
+          await watchController.markEpisodeUnwatched(episode.id);
+          break;
+        case _EpisodeRowMenuAction.downloadEpisode:
+        case _EpisodeRowMenuAction.retryDownload:
+          await downloadController.startDownload();
+          break;
+        case _EpisodeRowMenuAction.removeDownload:
+          final downloadId = downloadEntry?.id;
+          if (downloadId == null) {
+            throw StateError('A stored download could not be found for this episode.');
+          }
+          await downloadController.removeDownload(downloadId);
           break;
       }
     } catch (error) {
@@ -1057,7 +1146,7 @@ class _EpisodeRow extends ConsumerWidget {
         ..showSnackBar(
           SnackBar(
             content: Text(
-              'Could not update watched state for Episode ${episode.numberLabel}.\n$error',
+              'Could not update Episode ${episode.numberLabel}.\n$error',
             ),
           ),
         );
@@ -1074,6 +1163,14 @@ class _EpisodeRow extends ConsumerWidget {
         'Episode ${episode.numberLabel} marked as watched.',
       _EpisodeRowMenuAction.markUnwatched =>
         'Episode ${episode.numberLabel} reset to unwatched.',
+      _EpisodeRowMenuAction.downloadEpisode =>
+        'Episode ${episode.numberLabel} downloaded for offline playback.',
+      _EpisodeRowMenuAction.retryDownload =>
+        'Episode ${episode.numberLabel} download retried.',
+      _EpisodeRowMenuAction.removeDownload =>
+        'Offline download removed for Episode ${episode.numberLabel}.',
+      _EpisodeRowMenuAction.downloadInProgress =>
+        'Download already in progress.',
     };
 
     ScaffoldMessenger.of(context)
@@ -1195,9 +1292,13 @@ class _EpisodeActionHint {
 enum _EpisodeActionHintTone { primary, secondary }
 
 enum _EpisodeRowMenuAction {
-  play('Play Episode'),
-  markWatched('Mark as Watched'),
-  markUnwatched('Mark as Unwatched');
+  play('Play episode'),
+  downloadEpisode('Download for offline'),
+  retryDownload('Retry download'),
+  removeDownload('Remove offline download'),
+  downloadInProgress('Download in progress'),
+  markWatched('Mark as watched'),
+  markUnwatched('Mark as unwatched');
 
   const _EpisodeRowMenuAction(this.label);
 

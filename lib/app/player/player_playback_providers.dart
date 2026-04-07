@@ -4,13 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/adapters/anilibria/anilibria_remote_data_source.dart';
 import '../../data/dto/anilibria/anilibria_episode_dto.dart';
+import '../../domain/models/download_entry.dart';
+import '../../domain/repositories/downloads_repository.dart';
 import '../../features/player/player_screen_context.dart';
+import '../di/downloads_repository_provider.dart';
 import '../di/series_repository_provider.dart';
 import 'player_playback_source.dart';
 
 final playerPlaybackResolverProvider = Provider<PlayerPlaybackResolver>((ref) {
   return PlayerPlaybackResolver(
     remoteDataSource: ref.watch(anilibriaRemoteDataSourceProvider),
+    downloadsRepository: ref.watch(downloadsRepositoryProvider),
   );
 });
 
@@ -21,12 +25,31 @@ final playerPlaybackSourceProvider = FutureProvider.autoDispose
     });
 
 class PlayerPlaybackResolver {
-  PlayerPlaybackResolver({required AnilibriaRemoteDataSource remoteDataSource})
-    : _remoteDataSource = remoteDataSource;
+  PlayerPlaybackResolver({
+    required AnilibriaRemoteDataSource remoteDataSource,
+    required DownloadsRepository downloadsRepository,
+  }) : _remoteDataSource = remoteDataSource,
+       _downloadsRepository = downloadsRepository;
 
   final AnilibriaRemoteDataSource _remoteDataSource;
+  final DownloadsRepository _downloadsRepository;
 
   Future<PlayerPlaybackSource> resolve(PlayerScreenContext context) async {
+    final localDownload = await _downloadsRepository.getPlayableDownload(
+      seriesId: context.seriesId,
+      episodeId: context.episodeId,
+    );
+    if (localDownload != null) {
+      final localAssetUri = localDownload.localAssetUri;
+      if (localAssetUri != null && localAssetUri.trim().isNotEmpty) {
+        return PlayerPlaybackSource(
+          sourceUri: localAssetUri,
+          qualityLabel: '${localDownload.selectedQuality} offline',
+          kind: _mapDownloadSourceKind(localDownload.sourceKind),
+        );
+      }
+    }
+
     try {
       final release = await _remoteDataSource.fetchReleaseDetails(
         context.seriesId,
@@ -46,8 +69,9 @@ class PlayerPlaybackResolver {
       }
 
       return PlayerPlaybackSource(
-        streamUri: stream.streamUri,
+        sourceUri: stream.streamUri,
         qualityLabel: stream.qualityLabel,
+        kind: PlayerPlaybackSourceKind.remoteHls,
       );
     } on DioException catch (error) {
       throw PlayerPlaybackResolutionException(
@@ -59,6 +83,16 @@ class PlayerPlaybackResolver {
         'Release data for playback could not be parsed: ${error.message}',
       );
     }
+  }
+
+  PlayerPlaybackSourceKind _mapDownloadSourceKind(
+    DownloadSourceKind sourceKind,
+  ) {
+    return switch (sourceKind) {
+      DownloadSourceKind.localFile => PlayerPlaybackSourceKind.localFile,
+      DownloadSourceKind.localHlsManifest =>
+        PlayerPlaybackSourceKind.localHlsManifest,
+    };
   }
 
   AnilibriaEpisodeDto? _findEpisode(
