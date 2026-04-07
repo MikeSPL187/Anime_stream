@@ -9,6 +9,7 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
   DioAnilibriaRemoteDataSource({required Dio dio}) : _dio = dio;
 
   static const apiBaseUrl = 'https://anilibria.top/api/v1/';
+  static final Uri _mediaBaseUri = Uri.parse('https://anilibria.top/');
 
   final Dio _dio;
 
@@ -181,7 +182,10 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
       ),
       description: _readString(json['description']),
       genres: _readGenres(json['genres']),
-      images: AnilibriaImageSetDto(posterUrl: _extractPosterUrl(json)),
+      images: AnilibriaImageSetDto(
+        posterUrl: _extractPosterUrl(json),
+        bannerUrl: _extractBannerUrl(json),
+      ),
       releaseYear: _readInt(json['year']),
       updatedAt:
           _readDateTime(json['updated_at']) ??
@@ -282,25 +286,106 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
 
   String? _extractPosterUrl(Map<String, dynamic> json) {
     final posterJson = _readMap(json['poster']);
-    final optimizedJson = _readMap(posterJson?['optimized']);
+    final posterOptimizedJson = _readMap(posterJson?['optimized']);
+    final postersJson = _readMap(json['posters']);
+    final postersSmallJson = _readMap(postersJson?['small']);
+    final postersMediumJson = _readMap(postersJson?['medium']);
+    final postersOriginalJson = _readMap(postersJson?['original']);
 
-    return _readString(optimizedJson?['preview']) ??
-        _readString(optimizedJson?['src']) ??
-        _readString(posterJson?['preview']) ??
-        _readString(posterJson?['src']) ??
-        _readString(posterJson?['thumbnail']);
+    return _normalizeMediaUrl(
+      _firstReadableString([
+        posterOptimizedJson?['preview'],
+        posterOptimizedJson?['src'],
+        posterJson?['preview'],
+        posterJson?['src'],
+        posterJson?['thumbnail'],
+        postersMediumJson?['full_url'],
+        postersMediumJson?['url'],
+        postersSmallJson?['full_url'],
+        postersSmallJson?['url'],
+        postersOriginalJson?['full_url'],
+        postersOriginalJson?['url'],
+      ]),
+    );
+  }
+
+  String? _extractBannerUrl(Map<String, dynamic> json) {
+    final backgroundJson = _readMap(json['background']);
+    final backgroundOptimizedJson = _readMap(backgroundJson?['optimized']);
+    final bannerJson = _readMap(json['banner']);
+    final bannerOptimizedJson = _readMap(bannerJson?['optimized']);
+    final coverJson = _readMap(json['cover']);
+    final coverOptimizedJson = _readMap(coverJson?['optimized']);
+    final posterJson = _readMap(json['poster']);
+    final posterOptimizedJson = _readMap(posterJson?['optimized']);
+    final postersJson = _readMap(json['posters']);
+    final postersOriginalJson = _readMap(postersJson?['original']);
+
+    return _normalizeMediaUrl(
+      _firstReadableString([
+        backgroundOptimizedJson?['src'],
+        backgroundOptimizedJson?['preview'],
+        backgroundJson?['src'],
+        backgroundJson?['preview'],
+        bannerOptimizedJson?['src'],
+        bannerOptimizedJson?['preview'],
+        bannerJson?['src'],
+        bannerJson?['preview'],
+        coverOptimizedJson?['src'],
+        coverOptimizedJson?['preview'],
+        coverJson?['src'],
+        coverJson?['preview'],
+        postersOriginalJson?['full_url'],
+        postersOriginalJson?['url'],
+        posterOptimizedJson?['src'],
+        posterJson?['src'],
+      ]),
+    );
   }
 
   String? _extractEpisodePreviewUrl(Map<String, dynamic> json) {
     final previewJson = _readMap(json['preview']);
     final optimizedJson = _readMap(previewJson?['optimized']);
 
-    return _readString(optimizedJson?['thumbnail']) ??
-        _readString(optimizedJson?['preview']) ??
-        _readString(optimizedJson?['src']) ??
-        _readString(previewJson?['thumbnail']) ??
-        _readString(previewJson?['preview']) ??
-        _readString(previewJson?['src']);
+    return _normalizeMediaUrl(
+      _firstReadableString([
+        optimizedJson?['thumbnail'],
+        optimizedJson?['preview'],
+        optimizedJson?['src'],
+        previewJson?['thumbnail'],
+        previewJson?['preview'],
+        previewJson?['src'],
+      ]),
+    );
+  }
+
+  String? _firstReadableString(List<dynamic> values) {
+    for (final value in values) {
+      final parsed = _readString(value)?.trim();
+      if (parsed != null && parsed.isNotEmpty) {
+        return parsed;
+      }
+    }
+
+    return null;
+  }
+
+  String? _normalizeMediaUrl(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+
+    if (trimmed.startsWith('//')) {
+      return 'https:$trimmed';
+    }
+
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed != null && parsed.hasScheme) {
+      return trimmed;
+    }
+
+    return _mediaBaseUri.resolve(trimmed).toString();
   }
 
   _ParsedOrdinal? _readOrdinal(dynamic value) {

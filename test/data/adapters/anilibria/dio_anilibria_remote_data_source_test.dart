@@ -64,46 +64,63 @@ void main() {
       );
     });
 
-    test('parses episode stream urls from release details payloads', () async {
-      final dataSource = _buildDataSource((options) async {
-        expect(options.path, 'anime/releases/501');
-        expect(options.queryParameters, isEmpty);
+    test(
+      'normalizes media urls and parses episode stream urls from release details payloads',
+      () async {
+        final dataSource = _buildDataSource((options) async {
+          expect(options.path, 'anime/releases/501');
+          expect(options.queryParameters, isEmpty);
 
-        return _releasePayload(
-          id: 501,
-          alias: 'pluto',
-          mainName: 'Плутон',
-          englishName: 'Pluto',
-          episodes: [
-            _episodePayload(
-              id: 'episode-1',
-              ordinal: 1,
-              hls480Url: 'https://cdn.example.com/pluto/episode-1-480.m3u8',
-              hls720Url: 'https://cdn.example.com/pluto/episode-1-720.m3u8',
-              hls1080Url: 'https://cdn.example.com/pluto/episode-1-1080.m3u8',
-            ),
-          ],
+          return _releasePayload(
+            id: 501,
+            alias: 'pluto',
+            mainName: 'Плутон',
+            englishName: 'Pluto',
+            backgroundPath: '/storage/releases/backgrounds/501/background.webp',
+            episodes: [
+              _episodePayload(
+                id: 'episode-1',
+                ordinal: 1,
+                previewPath: '/episodes/501/episode-1-thumb.webp',
+                hls480Url: 'https://cdn.example.com/pluto/episode-1-480.m3u8',
+                hls720Url: 'https://cdn.example.com/pluto/episode-1-720.m3u8',
+                hls1080Url: 'https://cdn.example.com/pluto/episode-1-1080.m3u8',
+              ),
+            ],
+          );
+        });
+
+        final release = await dataSource.fetchReleaseDetails('501');
+
+        expect(
+          release.images?.posterUrl,
+          'https://anilibria.top/storage/releases/posters/501/poster-preview.webp',
         );
-      });
-
-      final release = await dataSource.fetchReleaseDetails('501');
-
-      expect(release.episodes, hasLength(1));
-      final episode = release.episodes.single;
-      expect(episode.id, 'episode-1');
-      expect(
-        episode.hls480Url,
-        'https://cdn.example.com/pluto/episode-1-480.m3u8',
-      );
-      expect(
-        episode.hls720Url,
-        'https://cdn.example.com/pluto/episode-1-720.m3u8',
-      );
-      expect(
-        episode.hls1080Url,
-        'https://cdn.example.com/pluto/episode-1-1080.m3u8',
-      );
-    });
+        expect(
+          release.images?.bannerUrl,
+          'https://anilibria.top/storage/releases/backgrounds/501/background.webp',
+        );
+        expect(release.episodes, hasLength(1));
+        final episode = release.episodes.single;
+        expect(episode.id, 'episode-1');
+        expect(
+          episode.thumbnailUrl,
+          'https://anilibria.top/episodes/501/episode-1-thumb.webp',
+        );
+        expect(
+          episode.hls480Url,
+          'https://cdn.example.com/pluto/episode-1-480.m3u8',
+        );
+        expect(
+          episode.hls720Url,
+          'https://cdn.example.com/pluto/episode-1-720.m3u8',
+        );
+        expect(
+          episode.hls1080Url,
+          'https://cdn.example.com/pluto/episode-1-1080.m3u8',
+        );
+      },
+    );
   });
 }
 
@@ -134,6 +151,7 @@ Map<String, Object?> _releasePayload({
   required String alias,
   required String mainName,
   required String englishName,
+  String? backgroundPath,
   List<Map<String, Object?>> episodes = const [],
 }) {
   return {
@@ -158,6 +176,15 @@ Map<String, Object?> _releasePayload({
         'thumbnail': '/storage/releases/posters/$id/poster-thumb.webp',
       },
     },
+    ...?backgroundPath == null
+        ? null
+        : {
+            'background': {
+              'src': backgroundPath,
+              'preview': backgroundPath,
+              'optimized': {'src': backgroundPath, 'preview': backgroundPath},
+            },
+          },
     'updated_at': '2024-03-22T10:58:31Z',
     'is_ongoing': true,
     'episodes': episodes,
@@ -167,6 +194,7 @@ Map<String, Object?> _releasePayload({
 Map<String, Object?> _episodePayload({
   required String id,
   required num ordinal,
+  String? previewPath,
   String? hls480Url,
   String? hls720Url,
   String? hls1080Url,
@@ -175,6 +203,20 @@ Map<String, Object?> _episodePayload({
     'id': id,
     'ordinal': ordinal,
     'name': 'Episode $ordinal',
+    ...?previewPath == null
+        ? null
+        : {
+            'preview': {
+              'src': previewPath,
+              'preview': previewPath,
+              'thumbnail': previewPath,
+              'optimized': {
+                'src': previewPath,
+                'preview': previewPath,
+                'thumbnail': previewPath,
+              },
+            },
+          },
     ...?hls480Url == null ? null : {'hls_480': hls480Url},
     ...?hls720Url == null ? null : {'hls_720': hls720Url},
     ...?hls1080Url == null ? null : {'hls_1080': hls1080Url},

@@ -27,6 +27,8 @@ void main() {
             genres: const ['Вампиры', 'Экшен'],
             updatedAt: '2021-06-29T12:27:35Z',
             year: 2017,
+            backgroundPath:
+                '/storage/releases/backgrounds/9000/background.webp',
           ),
         ];
       });
@@ -45,7 +47,11 @@ void main() {
       expect(series.genres, ['Вампиры', 'Экшен']);
       expect(
         series.posterImageUrl,
-        '/storage/releases/posters/9000/poster-preview.webp',
+        'https://anilibria.top/storage/releases/posters/9000/poster-preview.webp',
+      );
+      expect(
+        series.bannerImageUrl,
+        'https://anilibria.top/storage/releases/backgrounds/9000/background.webp',
       );
       expect(series.releaseYear, 2017);
       expect(series.status, SeriesStatus.unknown);
@@ -149,7 +155,10 @@ void main() {
       expect(episodes.first.sortOrder, 1);
       expect(episodes.first.numberLabel, '1');
       expect(episodes.first.title, 'Herr Dr. Tenma');
-      expect(episodes.first.thumbnailImageUrl, '/episodes/101/1-thumb.webp');
+      expect(
+        episodes.first.thumbnailImageUrl,
+        'https://anilibria.top/episodes/101/1-thumb.webp',
+      );
       expect(episodes.first.airDate, isNull);
       expect(episodes.first.duration, const Duration(seconds: 1440));
       expect(episodes.first.isFiller, isFalse);
@@ -157,7 +166,10 @@ void main() {
       expect(episodes.last.sortOrder, 2500);
       expect(episodes.last.numberLabel, '2.5');
       expect(episodes.last.title, 'Episode 2.5');
-      expect(episodes.last.thumbnailImageUrl, '/episodes/101/2-thumb.webp');
+      expect(
+        episodes.last.thumbnailImageUrl,
+        'https://anilibria.top/episodes/101/2-thumb.webp',
+      );
       expect(episodes.last.availability.status, AvailabilityStatus.available);
     });
 
@@ -296,6 +308,7 @@ Map<String, Object?> _releasePayload({
   required String englishName,
   List<String> genres = const ['Драма'],
   String description = 'Provider description',
+  String? backgroundPath,
   int? year,
   String updatedAt = '2024-03-22T10:58:31Z',
   List<Map<String, Object?>> episodes = const [],
@@ -322,6 +335,15 @@ Map<String, Object?> _releasePayload({
         'thumbnail': '/storage/releases/posters/$id/poster-thumb.webp',
       },
     },
+    ...?backgroundPath == null
+        ? null
+        : {
+            'background': {
+              'src': backgroundPath,
+              'preview': backgroundPath,
+              'optimized': {'src': backgroundPath, 'preview': backgroundPath},
+            },
+          },
     ...?year == null ? null : {'year': year},
     'updated_at': updatedAt,
     'is_ongoing': true,
