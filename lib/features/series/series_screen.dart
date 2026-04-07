@@ -52,16 +52,16 @@ class _SeriesPage extends StatelessWidget {
     final series = details.series;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         _SeriesHero(details: details),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         _PrimaryWatchPanel(details: details),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         _EpisodesSection(details: details),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         _SaveIntentSection(series: series),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         _SeriesDetailsSection(
           series: series,
           episodeCount: details.episodes.length,
@@ -84,7 +84,7 @@ class _SeriesHero extends StatelessWidget {
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
       '${details.episodes.length} episodes',
-    ].join('  •  ');
+    ].join(' • ');
     final progressSummary = switch ((
       details.inProgressEpisodeCount,
       details.completedEpisodeCount,
@@ -105,7 +105,7 @@ class _SeriesHero extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: SizedBox(
-            height: 236,
+            height: 220,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -138,13 +138,6 @@ class _SeriesHero extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Series',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
                         series.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -155,12 +148,12 @@ class _SeriesHero extends StatelessWidget {
                       ),
                       if ((series.originalTitle ?? '').trim().isNotEmpty &&
                           series.originalTitle != series.title) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 5),
                         Text(
                           series.originalTitle!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white.withValues(alpha: 0.82),
                           ),
                         ),
@@ -183,10 +176,10 @@ class _SeriesHero extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Text(
           progressSummary,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
@@ -213,7 +206,7 @@ class _PrimaryWatchPanel extends StatelessWidget {
       SeriesPrimaryWatchActionKind.startWatching when targetEpisode != null =>
         'Begin with Episode ${targetEpisode.numberLabel} • ${targetEpisode.title}',
       SeriesPrimaryWatchActionKind.endOfAvailableContent =>
-        'You have completed every currently available episode.',
+        'Every currently available episode is complete.',
       SeriesPrimaryWatchActionKind.unavailable =>
         'Episodes are not available yet.',
       _ => 'A playable episode is not available yet.',
@@ -237,29 +230,29 @@ class _PrimaryWatchPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Watch now', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(action.label, style: theme.textTheme.headlineSmall),
+            Text('Watch now', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(action.label, style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
               supportingText,
-              style: theme.textTheme.bodyMedium?.copyWith(
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                height: 1.3,
+                height: 1.25,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               activityText,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -315,7 +308,7 @@ class _SaveIntentSection extends ConsumerWidget {
           borderRadius: BorderRadius.circular(16),
         ),
         child: const Padding(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.all(14),
           child: Row(
             children: [
               SizedBox(
@@ -335,10 +328,10 @@ class _SaveIntentSection extends ConsumerWidget {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Text(
             'The saved-for-later state could not be loaded right now.\n$error',
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
@@ -351,7 +344,7 @@ class _SaveIntentSection extends ConsumerWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: isSaved
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,14 +353,14 @@ class _SaveIntentSection extends ConsumerWidget {
                         'Saved for later',
                         style: theme.textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Text(
-                        'This series is already in Watchlist and stays separate from active Continue Watching progress.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        'This series is already in Watchlist.',
+                        style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -399,14 +392,14 @@ class _SaveIntentSection extends ConsumerWidget {
                         'Save for later',
                         style: theme.textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Text(
-                        'Use Watchlist for intent to return later without starting playback right now.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        'Use Watchlist for intent to return later.',
+                        style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       FilledButton.tonalIcon(
                         onPressed: () => ref
                             .read(
@@ -449,19 +442,19 @@ class _SeriesDetailsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('About this series', style: theme.textTheme.titleLarge),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         if (facts.isNotEmpty)
           Text(
-            facts.join('  •  '),
-            style: theme.textTheme.bodyMedium?.copyWith(
+            facts.join(' • '),
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
             series.synopsis!.trim(),
-            style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
           ),
         ],
       ],
@@ -523,14 +516,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Choose your next watch decision directly from the episode list. Tap any row to open playback.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -573,7 +559,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         if (episodes.isEmpty)
           const _InlineEpisodesState(
             title: 'Episodes unavailable',
@@ -680,7 +666,7 @@ class _EpisodeFilterButton extends StatelessWidget {
         backgroundColor: isSelected
             ? theme.colorScheme.primary
             : theme.colorScheme.surfaceContainerLow,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
       child: Text('$label ($count)'),
@@ -704,7 +690,7 @@ class _InlineEpisodesState extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -816,25 +802,25 @@ class _EpisodeRow extends ConsumerWidget {
               ),
         child: Container(
           color: backgroundColor,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 54,
+                width: 48,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'EP',
-                      style: theme.textTheme.labelMedium?.copyWith(
+                      style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       episode.numberLabel,
-                      style: theme.textTheme.titleLarge,
+                      style: theme.textTheme.titleMedium,
                     ),
                   ],
                 ),
@@ -864,13 +850,13 @@ class _EpisodeRow extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      statusParts.join('  •  '),
+                      statusParts.join(' • '),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     if ((episode.synopsis ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         episode.synopsis!,
                         maxLines: 2,
@@ -881,7 +867,7 @@ class _EpisodeRow extends ConsumerWidget {
                       ),
                     ],
                     if (savedProgress != null) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         savedProgress!.isCompleted
                             ? 'Watched'
@@ -894,7 +880,7 @@ class _EpisodeRow extends ConsumerWidget {
                       ),
                     ],
                     if (progressFraction != null) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(999),
                         child: LinearProgressIndicator(
@@ -906,7 +892,7 @@ class _EpisodeRow extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Column(
                 children: [
                   IconButton(
