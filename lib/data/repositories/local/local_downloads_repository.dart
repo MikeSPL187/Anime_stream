@@ -48,10 +48,12 @@ class LocalDownloadsRepository implements DownloadsRepository {
     }
 
     matchingEntries.sort((left, right) {
-      final leftCompletedAt = left.completedAt ??
+      final leftCompletedAt =
+          left.completedAt ??
           left.createdAt ??
           DateTime.fromMillisecondsSinceEpoch(0);
-      final rightCompletedAt = right.completedAt ??
+      final rightCompletedAt =
+          right.completedAt ??
           right.createdAt ??
           DateTime.fromMillisecondsSinceEpoch(0);
       return rightCompletedAt.compareTo(leftCompletedAt);
@@ -150,18 +152,21 @@ class LocalDownloadsRepository implements DownloadsRepository {
         assetDirectory: assetDirectory,
       );
 
-      final completedEntry = baseEntry.copyWith(
+      final completedEntry = DownloadEntry(
         id: _buildKey(
           seriesId: seriesId,
           episodeId: episodeId,
           selectedQuality: resolvedStream.qualityLabel,
         ),
+        seriesId: seriesId,
+        episodeId: episodeId,
         selectedQuality: resolvedStream.qualityLabel,
         status: DownloadStatus.completed,
         bytesDownloaded: packagedAsset.bytesDownloaded,
         totalBytes: packagedAsset.bytesDownloaded,
         localAssetUri: packagedAsset.localManifestUri.toString(),
         storageDirectoryPath: assetDirectory.path,
+        createdAt: baseEntry.createdAt,
         completedAt: DateTime.now(),
         lastError: null,
         sourceKind: DownloadSourceKind.localHlsManifest,
@@ -221,10 +226,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
     await _downloadsStore.writeAll(storedEntries);
   }
 
-  Future<void> _writeEntry(
-    DownloadEntry entry, {
-    String? removeKey,
-  }) async {
+  Future<void> _writeEntry(DownloadEntry entry, {String? removeKey}) async {
     final storedEntries = Map<String, dynamic>.from(
       await _downloadsStore.readAll(),
     );
@@ -353,7 +355,8 @@ class LocalDownloadsRepository implements DownloadsRepository {
     }
 
     final extension = _resolveFileExtension(assetUri.path);
-    final localFileName = 'asset_${assetIndex.toString().padLeft(4, '0')}$extension';
+    final localFileName =
+        'asset_${assetIndex.toString().padLeft(4, '0')}$extension';
     final localFile = File('${assetDirectory.path}/$localFileName');
     await localFile.writeAsBytes(assetBytes);
 
@@ -384,22 +387,17 @@ class LocalDownloadsRepository implements DownloadsRepository {
     final normalizedQuality = requestedQuality.trim().toLowerCase();
     final orderedCandidates = switch (normalizedQuality) {
       '1080p' => const [
-          ('1080p', 'hls1080Url'),
-          ('720p', 'hls720Url'),
-          ('480p', 'hls480Url'),
-        ],
-      '720p' => const [
-          ('720p', 'hls720Url'),
-          ('480p', 'hls480Url'),
-        ],
-      '480p' => const [
-          ('480p', 'hls480Url'),
-        ],
+        ('1080p', 'hls1080Url'),
+        ('720p', 'hls720Url'),
+        ('480p', 'hls480Url'),
+      ],
+      '720p' => const [('720p', 'hls720Url'), ('480p', 'hls480Url')],
+      '480p' => const [('480p', 'hls480Url')],
       _ => const [
-          ('1080p', 'hls1080Url'),
-          ('720p', 'hls720Url'),
-          ('480p', 'hls480Url'),
-        ],
+        ('1080p', 'hls1080Url'),
+        ('720p', 'hls720Url'),
+        ('480p', 'hls480Url'),
+      ],
     };
 
     for (final (qualityLabel, key) in orderedCandidates) {
@@ -453,15 +451,30 @@ class LocalDownloadsRepository implements DownloadsRepository {
   }
 
   Future<List<DownloadEntry>> _readEntries() async {
-    final storedEntries = await _downloadsStore.readAll();
+    final storedEntries = Map<String, dynamic>.from(
+      await _downloadsStore.readAll(),
+    );
     final entries = <DownloadEntry>[];
+    var didMutateStore = false;
 
-    for (final payload in storedEntries.values) {
+    for (final record in storedEntries.entries.toList(growable: false)) {
+      final payload = record.value;
       if (payload is! Map) {
         continue;
       }
 
-      entries.add(DownloadEntry.fromJson(Map<String, dynamic>.from(payload)));
+      final entry = DownloadEntry.fromJson(Map<String, dynamic>.from(payload));
+      final normalizedEntry = await _normalizeStoredEntry(entry);
+      if (normalizedEntry.changed) {
+        storedEntries[record.key] = normalizedEntry.entry.toJson();
+        didMutateStore = true;
+      }
+
+      entries.add(normalizedEntry.entry);
+    }
+
+    if (didMutateStore) {
+      await _downloadsStore.writeAll(storedEntries);
     }
 
     entries.sort((left, right) {
@@ -473,6 +486,109 @@ class LocalDownloadsRepository implements DownloadsRepository {
     });
 
     return List.unmodifiable(entries);
+  }
+
+  Future<_NormalizedDownloadEntry> _normalizeStoredEntry(
+    DownloadEntry entry,
+  ) async {
+    if (!entry.isPlayableOffline) {
+      return _NormalizedDownloadEntry(entry: entry, changed: false);
+    }
+
+    final assetUriValue = entry.localAssetUri?.trim();
+    if (assetUriValue == null || assetUriValue.isEmpty) {
+      return _NormalizedDownloadEntry(
+        entry: _buildStaleFailureEntry(
+          entry,
+          'Offline asset reference is missing.',
+        ),
+        changed: true,
+      );
+    }
+
+    final assetUri = Uri.tryParse(assetUriValue);
+    if (assetUri == null || assetUri.scheme != 'file') {
+      return _NormalizedDownloadEntry(
+        entry: _buildStaleFailureEntry(
+          entry,
+          'Offline asset reference is invalid.',
+        ),
+        changed: true,
+      );
+    }
+
+    final assetFile = File.fromUri(assetUri);
+    if (!await assetFile.exists()) {
+      return _NormalizedDownloadEntry(
+        entry: _buildStaleFailureEntry(
+          entry,
+          'Offline asset is missing on device.',
+        ),
+        changed: true,
+      );
+    }
+
+    try {
+      final fileLength = await assetFile.length();
+      if (fileLength <= 0) {
+        return _NormalizedDownloadEntry(
+          entry: _buildStaleFailureEntry(entry, 'Offline asset is empty.'),
+          changed: true,
+        );
+      }
+    } on FileSystemException {
+      return _NormalizedDownloadEntry(
+        entry: _buildStaleFailureEntry(
+          entry,
+          'Offline asset could not be inspected.',
+        ),
+        changed: true,
+      );
+    }
+
+    if (entry.sourceKind == DownloadSourceKind.localHlsManifest) {
+      final storageDirectoryPath = entry.storageDirectoryPath?.trim();
+      if (storageDirectoryPath == null || storageDirectoryPath.isEmpty) {
+        return _NormalizedDownloadEntry(
+          entry: _buildStaleFailureEntry(
+            entry,
+            'Offline package directory is missing.',
+          ),
+          changed: true,
+        );
+      }
+
+      final assetDirectory = Directory(storageDirectoryPath);
+      if (!await assetDirectory.exists()) {
+        return _NormalizedDownloadEntry(
+          entry: _buildStaleFailureEntry(
+            entry,
+            'Offline package directory is missing on device.',
+          ),
+          changed: true,
+        );
+      }
+    }
+
+    return _NormalizedDownloadEntry(entry: entry, changed: false);
+  }
+
+  DownloadEntry _buildStaleFailureEntry(DownloadEntry entry, String reason) {
+    return DownloadEntry(
+      id: entry.id,
+      seriesId: entry.seriesId,
+      episodeId: entry.episodeId,
+      selectedQuality: entry.selectedQuality,
+      status: DownloadStatus.failed,
+      bytesDownloaded: entry.bytesDownloaded,
+      totalBytes: entry.totalBytes,
+      localAssetUri: null,
+      storageDirectoryPath: entry.storageDirectoryPath,
+      createdAt: entry.createdAt,
+      completedAt: null,
+      lastError: reason,
+      sourceKind: entry.sourceKind,
+    );
   }
 }
 
@@ -513,4 +629,11 @@ class _PackagedAssetReference {
 
   final String rewrittenLine;
   final int bytesDownloaded;
+}
+
+class _NormalizedDownloadEntry {
+  const _NormalizedDownloadEntry({required this.entry, required this.changed});
+
+  final DownloadEntry entry;
+  final bool changed;
 }
