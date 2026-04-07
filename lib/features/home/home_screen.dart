@@ -7,6 +7,7 @@ import '../../app/home/home_continue_watching.dart';
 import '../../app/router/app_router.dart';
 import '../../app/series/series_providers.dart';
 import '../../domain/models/series.dart';
+import '../../shared/widgets/anime_cached_artwork.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -67,9 +68,7 @@ class _HomeLaunchSurface extends StatelessWidget {
     }
 
     return RefreshIndicator(
-      onRefresh: () async {
-        // This phase intentionally keeps Home read-side only.
-      },
+      onRefresh: () async {},
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
@@ -172,9 +171,9 @@ class _ContinueWatchingCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _ArtworkImage(
+                      AnimeCachedArtwork(
                         imageUrl: item.seriesPosterImageUrl,
-                        fallbackLabel: item.seriesTitle,
+                        label: item.seriesTitle,
                         icon: Icons.movie_creation_outlined,
                         alignment: Alignment.topCenter,
                       ),
@@ -286,9 +285,9 @@ class _FeaturedHero extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                _ArtworkImage(
+                AnimeCachedArtwork(
                   imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
-                  fallbackLabel: series.title,
+                  label: series.title,
                   icon: Icons.live_tv_rounded,
                   alignment: Alignment.topCenter,
                 ),
@@ -533,9 +532,9 @@ class _PosterRailCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   child: AspectRatio(
                     aspectRatio: 2 / 3,
-                    child: _ArtworkImage(
+                    child: AnimeCachedArtwork(
                       imageUrl: series.posterImageUrl,
-                      fallbackLabel: series.title,
+                      label: series.title,
                       icon: Icons.movie_creation_outlined,
                       alignment: Alignment.topCenter,
                     ),
@@ -652,99 +651,6 @@ class _InlineEmptyState extends StatelessWidget {
             Text(
               message,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ArtworkImage extends StatelessWidget {
-  const _ArtworkImage({
-    required this.imageUrl,
-    required this.fallbackLabel,
-    required this.icon,
-    this.alignment = Alignment.center,
-  });
-
-  final String? imageUrl;
-  final String fallbackLabel;
-  final IconData icon;
-  final Alignment alignment;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final trimmedUrl = imageUrl?.trim();
-
-    if (trimmedUrl == null || trimmedUrl.isEmpty) {
-      return _ArtworkFallback(fallbackLabel: fallbackLabel, icon: icon);
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHigh),
-      child: Image.network(
-        trimmedUrl,
-        fit: BoxFit.cover,
-        alignment: alignment,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            return child;
-          }
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              _ArtworkFallback(fallbackLabel: fallbackLabel, icon: icon),
-              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ],
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _ArtworkFallback(fallbackLabel: fallbackLabel, icon: icon);
-        },
-      ),
-    );
-  }
-}
-
-class _ArtworkFallback extends StatelessWidget {
-  const _ArtworkFallback({required this.fallbackLabel, required this.icon});
-
-  final String fallbackLabel;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surfaceContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(height: 8),
-            Text(
-              fallbackLabel,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),

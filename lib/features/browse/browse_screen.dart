@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/browse/browse_providers.dart';
 import '../../app/router/app_router.dart';
 import '../../domain/models/series.dart';
+import '../../shared/widgets/anime_cached_artwork.dart';
 
 class BrowseScreen extends ConsumerWidget {
   const BrowseScreen({super.key});
@@ -136,7 +137,7 @@ class _BrowseSpotlight extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _Artwork(
+            AnimeCachedArtwork(
               imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
               label: series.title,
               icon: Icons.live_tv_rounded,
@@ -284,7 +285,7 @@ class _BrowsePosterTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 child: AspectRatio(
                   aspectRatio: 2 / 3,
-                  child: _Artwork(
+                  child: AnimeCachedArtwork(
                     imageUrl: series.posterImageUrl,
                     label: series.title,
                     icon: Icons.movie_creation_outlined,
@@ -310,97 +311,6 @@ class _BrowsePosterTile extends StatelessWidget {
                 ),
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Artwork extends StatelessWidget {
-  const _Artwork({
-    required this.imageUrl,
-    required this.label,
-    required this.icon,
-    this.alignment = Alignment.center,
-  });
-
-  final String? imageUrl;
-  final String label;
-  final IconData icon;
-  final Alignment alignment;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final trimmedUrl = imageUrl?.trim();
-
-    if (trimmedUrl == null || trimmedUrl.isEmpty) {
-      return _ArtworkFallback(label: label, icon: icon);
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHigh),
-      child: Image.network(
-        trimmedUrl,
-        fit: BoxFit.cover,
-        alignment: alignment,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            return child;
-          }
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              _ArtworkFallback(label: label, icon: icon),
-              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ],
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _ArtworkFallback(label: label, icon: icon);
-        },
-      ),
-    );
-  }
-}
-
-class _ArtworkFallback extends StatelessWidget {
-  const _ArtworkFallback({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surfaceContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
           ],
         ),
       ),
