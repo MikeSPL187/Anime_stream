@@ -1,14 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../app/player/player_playback_providers.dart';
-import '../../app/player/player_progress_providers.dart';
 import '../../app/player/player_playback_source.dart';
+import '../../app/player/player_progress_providers.dart';
 import '../../app/router/app_router.dart';
 import 'player_screen_context.dart';
 
@@ -21,7 +22,7 @@ class PlayerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (sessionContext == null) {
       return const Scaffold(
-        appBar: _PlayerAppBar(),
+        backgroundColor: Colors.black,
         body: SafeArea(child: _MissingSessionContextState()),
       );
     }
@@ -30,36 +31,152 @@ class PlayerScreen extends ConsumerWidget {
       playerPlaybackSourceProvider(sessionContext!),
     );
 
-    return Scaffold(
-      appBar: const _PlayerAppBar(),
-      body: SafeArea(
-        child: playbackSourceAsync.when(
-          loading: () =>
-              _PlayerResolutionLoadingState(sessionContext: sessionContext!),
-          error: (error, stackTrace) => _PlayerResolutionErrorState(
-            sessionContext: sessionContext!,
-            error: error,
-          ),
-          data: (playbackSource) => _ResolvedPlaybackSurface(
-            sessionContext: sessionContext!,
-            playbackSource: playbackSource,
+    return _PlayerRouteChrome(
+      sessionContext: sessionContext!,
+      playbackSourceAsync: playbackSourceAsync,
+    );
+  }
+}
+
+class _PlayerRouteChrome extends StatefulWidget {
+  const _PlayerRouteChrome({
+    required this.sessionContext,
+    required this.playbackSourceAsync,
+  });
+
+  final PlayerScreenContext sessionContext;
+  final AsyncValue<PlayerPlaybackSource> playbackSourceAsync;
+
+  @override
+  State<_PlayerRouteChrome> createState() => _PlayerRouteChromeState();
+}
+
+class _PlayerRouteChromeState extends State<_PlayerRouteChrome> {
+  bool _didInitializeContract = false;
+  bool _usesHandsetContract = false;
+  bool _isFullscreen = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_didInitializeContract) {
+      return;
+    }
+
+    _didInitializeContract = true;
+    _usesHandsetContract = _isHandsetLayout(context);
+    _isFullscreen = _usesHandsetContract;
+    unawaited(_applyRouteMode(fullscreen: _isFullscreen));
+  }
+
+  @override
+  void dispose() {
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    unawaited(
+      SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]),
+    );
+    super.dispose();
+  }
+
+  Future<void> _applyRouteMode({required bool fullscreen}) async {
+    if (_usesHandsetContract) {
+      await SystemChrome.setPreferredOrientations(
+        fullscreen
+            ? const [
+                DeviceOrientation.landscapeLeft,
+                DeviceOrientation.landscapeRight,
+              ]
+            : const [DeviceOrientation.portraitUp],
+      );
+    }
+
+    await SystemChrome.setEnabledSystemUIMode(
+      fullscreen ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+    );
+  }
+
+  Future<void> _setFullscreen(bool fullscreen) async {
+    if (!_usesHandsetContract || _isFullscreen == fullscreen) {
+      return;
+    }
+
+    setState(() {
+      _isFullscreen = fullscreen;
+    });
+
+    await _applyRouteMode(fullscreen: fullscreen);
+  }
+
+  Future<bool> _handleWillPop() async {
+    if (_usesHandsetContract && _isFullscreen) {
+      await _setFullscreen(false);
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<void> _handleBackRequested() async {
+    final shouldPop = await _handleWillPop();
+    if (!mounted || !shouldPop) {
+      return;
+    }
+
+    Navigator.of(context).maybePop();
+  }
+
+  bool _isHandsetLayout(BuildContext context) {
+    return MediaQuery.sizeOf(context).shortestSide < 600;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: PopScope<void>(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            return;
+          }
+
+          unawaited(_handleBackRequested());
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: widget.playbackSourceAsync.when(
+            loading: () => _PlayerResolutionStage(
+              sessionContext: widget.sessionContext,
+              title: 'Preparing Playback',
+              message: 'Resolving this episode into a playable stream.',
+              onBackRequested: _handleBackRequested,
+              child: const CircularProgressIndicator(),
+            ),
+            error: (error, stackTrace) => _PlayerResolutionStage(
+              sessionContext: widget.sessionContext,
+              title: 'Playback Unavailable',
+              message: error.toString(),
+              onBackRequested: _handleBackRequested,
+              child: const Icon(
+                Icons.error_outline_rounded,
+                size: 40,
+                color: Colors.white,
+              ),
+            ),
+            data: (playbackSource) => _ResolvedPlaybackSurface(
+              sessionContext: widget.sessionContext,
+              playbackSource: playbackSource,
+              isFullscreen: _isFullscreen,
+              canToggleFullscreen: _usesHandsetContract,
+              onToggleFullscreen: () => _setFullscreen(!_isFullscreen),
+              onBackRequested: _handleBackRequested,
+            ),
           ),
         ),
       ),
     );
   }
-}
-
-class _PlayerAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _PlayerAppBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppBar(title: const Text('Player'));
-  }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
 class _MissingSessionContextState extends StatelessWidget {
@@ -67,74 +184,102 @@ class _MissingSessionContextState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Text(
-          'No watch session was provided.\nReturn to a series and choose an episode to enter the player.',
-          textAlign: TextAlign.center,
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'No watch session was provided.\nReturn to a series and choose an episode to enter the player.',
+              textAlign: TextAlign.center,
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _PlayerResolutionLoadingState extends StatelessWidget {
-  const _PlayerResolutionLoadingState({required this.sessionContext});
-
-  final PlayerScreenContext sessionContext;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _SessionHeader(sessionContext: sessionContext),
-        const SizedBox(height: 16),
-        const _VideoStageCard(
-          title: 'Preparing Playback',
-          message: 'Resolving this episode into a playable stream.',
-          child: CircularProgressIndicator(),
-        ),
-        const SizedBox(height: 16),
-        const _InfoCard(
-          title: 'What Happens Next',
-          child: Text(
-            'Once the stream is ready, playback starts in the dedicated watch surface.',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PlayerResolutionErrorState extends StatelessWidget {
-  const _PlayerResolutionErrorState({
+class _PlayerResolutionStage extends StatelessWidget {
+  const _PlayerResolutionStage({
     required this.sessionContext,
-    required this.error,
+    required this.title,
+    required this.message,
+    required this.child,
+    required this.onBackRequested,
   });
 
   final PlayerScreenContext sessionContext;
-  final Object error;
+  final String title;
+  final String message;
+  final Widget child;
+  final Future<void> Function() onBackRequested;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _SessionHeader(sessionContext: sessionContext),
-        const SizedBox(height: 16),
-        const _VideoStageCard(
-          title: 'Playback Unavailable',
-          message: 'The selected episode could not be prepared for playback.',
-          child: Icon(Icons.error_outline_rounded, size: 36),
+    final media = MediaQuery.of(context);
+    final showLandscapeLayout =
+        media.orientation == Orientation.landscape &&
+        media.size.shortestSide >= 600;
+
+    final sessionSummary = _SessionSummaryPanel(
+      sessionContext: sessionContext,
+      qualityLabel: null,
+      streamHost: null,
+      statusText: 'Player is preparing this stream.',
+      statusLabel: 'Opening',
+      primaryActionLabel: 'Back',
+      onPrimaryAction: onBackRequested,
+    );
+
+    return ColoredBox(
+      color: Colors.black,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: showLandscapeLayout
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: _StageFrame(
+                        child: _StageContent(
+                          title: title,
+                          message: message,
+                          child: child,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    SizedBox(width: 340, child: sessionSummary),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _RouteBackButton(onPressed: onBackRequested),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: _StageFrame(
+                        child: _StageContent(
+                          title: title,
+                          message: message,
+                          child: child,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    sessionSummary,
+                  ],
+                ),
         ),
-        const SizedBox(height: 16),
-        _InfoCard(
-          title: 'Playback Resolution Failed',
-          child: Text(error.toString()),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -143,10 +288,18 @@ class _ResolvedPlaybackSurface extends ConsumerStatefulWidget {
   const _ResolvedPlaybackSurface({
     required this.sessionContext,
     required this.playbackSource,
+    required this.isFullscreen,
+    required this.canToggleFullscreen,
+    required this.onToggleFullscreen,
+    required this.onBackRequested,
   });
 
   final PlayerScreenContext sessionContext;
   final PlayerPlaybackSource playbackSource;
+  final bool isFullscreen;
+  final bool canToggleFullscreen;
+  final Future<void> Function() onToggleFullscreen;
+  final Future<void> Function() onBackRequested;
 
   @override
   ConsumerState<_ResolvedPlaybackSurface> createState() =>
@@ -156,6 +309,7 @@ class _ResolvedPlaybackSurface extends ConsumerStatefulWidget {
 class _ResolvedPlaybackSurfaceState
     extends ConsumerState<_ResolvedPlaybackSurface> {
   static const _progressWriteStep = Duration(seconds: 15);
+  static const _controlsAutoHideDelay = Duration(seconds: 3);
 
   Player? _player;
   VideoController? _videoController;
@@ -163,17 +317,35 @@ class _ResolvedPlaybackSurfaceState
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration>? _durationSubscription;
   StreamSubscription<bool>? _completedSubscription;
+  StreamSubscription<bool>? _playingSubscription;
+  StreamSubscription<bool>? _bufferingSubscription;
+  Timer? _controlsHideTimer;
+
   String? _playbackError;
   bool _isOpening = true;
+  bool _controlsVisible = true;
+  bool _isPlaying = true;
+  bool _isBuffering = false;
+  bool _isCompleted = false;
   Duration _latestPosition = Duration.zero;
   Duration? _latestTotalDuration;
   Duration _lastPersistedPosition = Duration.zero;
-  bool _isCompleted = false;
 
   @override
   void initState() {
     super.initState();
     unawaited(_openPlayback());
+  }
+
+  @override
+  void didUpdateWidget(covariant _ResolvedPlaybackSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.isFullscreen && _isPlaying) {
+      _scheduleControlsAutoHide();
+    } else {
+      _showControls();
+    }
   }
 
   Future<void> _openPlayback() async {
@@ -186,12 +358,14 @@ class _ResolvedPlaybackSurfaceState
 
       _errorSubscription = player.stream.error.listen((message) {
         if (!mounted) {
+          _playbackError = message;
           return;
         }
 
         setState(() {
           _playbackError = message;
         });
+        _showControls();
       });
 
       _positionSubscription = player.stream.position.listen((position) {
@@ -226,9 +400,44 @@ class _ResolvedPlaybackSurfaceState
         } else {
           _isCompleted = true;
         }
+        _showControls();
         unawaited(
           _persistProgressSnapshot(progressController, isCompleted: true),
         );
+      });
+
+      _playingSubscription = player.stream.playing.listen((isPlaying) {
+        if (!mounted) {
+          _isPlaying = isPlaying;
+          return;
+        }
+
+        setState(() {
+          _isPlaying = isPlaying;
+        });
+
+        if (isPlaying) {
+          _scheduleControlsAutoHide();
+        } else {
+          _showControls();
+        }
+      });
+
+      _bufferingSubscription = player.stream.buffering.listen((isBuffering) {
+        if (!mounted) {
+          _isBuffering = isBuffering;
+          return;
+        }
+
+        setState(() {
+          _isBuffering = isBuffering;
+        });
+
+        if (isBuffering) {
+          _showControls();
+        } else {
+          _scheduleControlsAutoHide();
+        }
       });
 
       await player.open(Media(widget.playbackSource.streamUri));
@@ -245,6 +454,8 @@ class _ResolvedPlaybackSurfaceState
         _videoController = videoController;
         _isOpening = false;
       });
+
+      _scheduleControlsAutoHide();
     } catch (error) {
       if (!mounted) {
         return;
@@ -254,11 +465,13 @@ class _ResolvedPlaybackSurfaceState
         _playbackError = error.toString();
         _isOpening = false;
       });
+      _showControls();
     }
   }
 
   @override
   void dispose() {
+    _controlsHideTimer?.cancel();
     unawaited(_persistProgressOnExit());
     unawaited(_cancelSubscriptions());
     unawaited(_player?.dispose());
@@ -329,35 +542,89 @@ class _ResolvedPlaybackSurfaceState
   }
 
   Future<void> _cancelSubscriptions() async {
+    await _bufferingSubscription?.cancel();
+    await _playingSubscription?.cancel();
     await _completedSubscription?.cancel();
     await _durationSubscription?.cancel();
     await _positionSubscription?.cancel();
     await _errorSubscription?.cancel();
   }
 
-  Future<void> _handlePrimaryPlaybackAction(bool isPlaying) async {
+  void _showControls() {
+    _controlsHideTimer?.cancel();
+
+    if (!mounted) {
+      _controlsVisible = true;
+      return;
+    }
+
+    setState(() {
+      _controlsVisible = true;
+    });
+  }
+
+  void _scheduleControlsAutoHide() {
+    _controlsHideTimer?.cancel();
+
+    if (!_isPlaying || _isBuffering || _isCompleted) {
+      return;
+    }
+
+    _controlsHideTimer = Timer(_controlsAutoHideDelay, () {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _controlsVisible = false;
+      });
+    });
+  }
+
+  void _toggleControlsVisibility() {
+    if (_controlsVisible) {
+      if (!_isPlaying || _isBuffering || _isCompleted) {
+        return;
+      }
+
+      setState(() {
+        _controlsVisible = false;
+      });
+      return;
+    }
+
+    _showControls();
+    _scheduleControlsAutoHide();
+  }
+
+  Future<void> _handlePrimaryPlaybackAction() async {
     final player = _player;
     if (player == null) {
       return;
     }
 
+    _showControls();
+
     if (_isCompleted) {
       await _restartPlayback(player);
+      _scheduleControlsAutoHide();
       return;
     }
 
-    if (isPlaying) {
+    if (_isPlaying) {
       await player.pause();
       return;
     }
 
     await player.play();
+    _scheduleControlsAutoHide();
   }
 
   Future<void> _restartPlayback(Player player) async {
     await player.seek(Duration.zero);
     _latestPosition = Duration.zero;
     _lastPersistedPosition = Duration.zero;
+
     if (mounted) {
       setState(() {
         _isCompleted = false;
@@ -365,488 +632,673 @@ class _ResolvedPlaybackSurfaceState
     } else {
       _isCompleted = false;
     }
+
     await player.play();
+  }
+
+  Future<void> _seekBy(Duration offset) async {
+    final player = _player;
+    if (player == null) {
+      return;
+    }
+
+    final totalDuration = _latestTotalDuration;
+    var target = _latestPosition + offset;
+
+    if (target < Duration.zero) {
+      target = Duration.zero;
+    }
+
+    if (totalDuration != null && target > totalDuration) {
+      target = totalDuration;
+    }
+
+    if (_isCompleted && target < (totalDuration ?? Duration.zero)) {
+      setState(() {
+        _isCompleted = false;
+      });
+    }
+
+    _showControls();
+    await player.seek(target);
+    _scheduleControlsAutoHide();
+  }
+
+  void _openSeriesHub() {
+    context.go(AppRoutePaths.seriesDetails(widget.sessionContext.seriesId));
+  }
+
+  bool _isHandsetLayout(BuildContext context) {
+    return MediaQuery.sizeOf(context).shortestSide < 600;
   }
 
   @override
   Widget build(BuildContext context) {
     if (_playbackError != null) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _SessionHeader(sessionContext: widget.sessionContext),
-          const SizedBox(height: 16),
-          const _VideoStageCard(
-            title: 'Playback Failed',
-            message: 'The stream started to open but could not continue.',
-            child: Icon(Icons.error_outline_rounded, size: 36),
-          ),
-          const SizedBox(height: 16),
-          _InfoCard(title: 'Playback Details', child: Text(_playbackError!)),
-        ],
+      return _PlayerResolutionStage(
+        sessionContext: widget.sessionContext,
+        title: 'Playback Failed',
+        message: _playbackError!,
+        onBackRequested: widget.onBackRequested,
+        child: const Icon(
+          Icons.error_outline_rounded,
+          size: 40,
+          color: Colors.white,
+        ),
       );
     }
 
     if (_videoController == null || _player == null || _isOpening) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _SessionHeader(sessionContext: widget.sessionContext),
-          const SizedBox(height: 16),
-          _VideoStageCard(
-            title: 'Opening Stream',
-            message:
-                'Opening ${widget.playbackSource.qualityLabel} playback for this episode.',
-            child: const CircularProgressIndicator(),
-          ),
-          const SizedBox(height: 16),
-          _InfoCard(
-            title: 'Playback Startup',
-            child: Text(
-              'Saved progress will be restored automatically when available, and new playback progress will sync back to Continue Watching and this series.',
-            ),
-          ),
-        ],
+      return _PlayerResolutionStage(
+        sessionContext: widget.sessionContext,
+        title: 'Opening Stream',
+        message:
+            'Opening ${widget.playbackSource.qualityLabel} playback for this episode.',
+        onBackRequested: widget.onBackRequested,
+        child: const CircularProgressIndicator(),
       );
     }
 
+    final isHandset = _isHandsetLayout(context);
+    final showHandsetCompanion = isHandset && !widget.isFullscreen;
     final streamHost = Uri.tryParse(widget.playbackSource.streamUri)?.host;
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _SessionHeader(sessionContext: widget.sessionContext),
-        const SizedBox(height: 16),
-        _PlaybackVideoCard(
-          videoController: _videoController!,
-          player: _player!,
-          isCompleted: _isCompleted,
-        ),
-        const SizedBox(height: 16),
-        _PlaybackControlPanel(
-          player: _player!,
-          qualityLabel: widget.playbackSource.qualityLabel,
-          streamHost: streamHost,
-          isCompleted: _isCompleted,
-          onPrimaryAction: _handlePrimaryPlaybackAction,
-        ),
-        const SizedBox(height: 16),
-        _WatchFlowContextCard(
-          sessionContext: widget.sessionContext,
-          isCompleted: _isCompleted,
-        ),
-        const SizedBox(height: 16),
-        StreamBuilder<bool>(
-          stream: _player!.stream.playing,
-          initialData: true,
-          builder: (context, playingSnapshot) {
-            final isPlaying = playingSnapshot.data ?? false;
-            return StreamBuilder<bool>(
-              stream: _player!.stream.buffering,
-              initialData: false,
-              builder: (context, bufferingSnapshot) {
-                final isBuffering = bufferingSnapshot.data ?? false;
-                return _InfoCard(
-                  title: 'Playback Status',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _PlaybackStateBadgeRow(
-                        isPlaying: isPlaying,
-                        isBuffering: isBuffering,
-                        isCompleted: _isCompleted,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _statusMessage(
-                          isPlaying: isPlaying,
-                          isBuffering: isBuffering,
-                          isCompleted: _isCompleted,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        ),
-        if (_isCompleted) ...[
-          const SizedBox(height: 16),
-          _EpisodeCompletionCard(sessionContext: widget.sessionContext),
-        ],
-      ],
+    final stage = _PlaybackStage(
+      videoController: _videoController!,
+      player: _player!,
+      sessionContext: widget.sessionContext,
+      qualityLabel: widget.playbackSource.qualityLabel,
+      isPlaying: _isPlaying,
+      isBuffering: _isBuffering,
+      isCompleted: _isCompleted,
+      controlsVisible: _controlsVisible,
+      canToggleFullscreen: widget.canToggleFullscreen,
+      isFullscreen: widget.isFullscreen,
+      onBackRequested: widget.onBackRequested,
+      onOpenSeriesRequested: _openSeriesHub,
+      onPrimaryAction: _handlePrimaryPlaybackAction,
+      onSeekBackward: () => _seekBy(const Duration(seconds: -10)),
+      onSeekForward: () => _seekBy(const Duration(seconds: 10)),
+      onToggleFullscreen: widget.onToggleFullscreen,
+      onStageTap: _toggleControlsVisibility,
+      onTimelineInteractionStart: _showControls,
+      onTimelineInteractionEnd: _scheduleControlsAutoHide,
     );
-  }
 
-  String _statusMessage({
-    required bool isPlaying,
-    required bool isBuffering,
-    required bool isCompleted,
-  }) {
-    if (isCompleted) {
-      return 'Playback reached the end of the episode.';
-    }
-
-    if (isBuffering) {
-      return 'Playback is buffering while the stream catches up.';
-    }
-
-    if (isPlaying) {
-      return 'Playback is active.';
-    }
-
-    return 'Playback is paused and ready to continue.';
-  }
-}
-
-class _WatchFlowContextCard extends StatelessWidget {
-  const _WatchFlowContextCard({
-    required this.sessionContext,
-    required this.isCompleted,
-  });
-
-  final PlayerScreenContext sessionContext;
-  final bool isCompleted;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final journeyText = isCompleted
-        ? 'This episode is complete. Go back to your previous screen or open the series page to choose what to watch next.'
-        : 'Progress saves while you watch. Leaving now returns to your previous screen, and this episode can reappear in Continue Watching until it is finished.';
-
-    return _InfoCard(
-      title: 'Watch Journey',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            journeyText,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (!isCompleted) ...[
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.tonalIcon(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Back'),
-                ),
-                TextButton.icon(
-                  onPressed: () => context.push(
-                    AppRoutePaths.seriesDetails(sessionContext.seriesId),
-                  ),
-                  icon: const Icon(Icons.menu_book_rounded),
-                  label: const Text('Open Series'),
-                ),
-              ],
-            ),
-          ],
-        ],
+    final companionPanel = _SessionSummaryPanel(
+      sessionContext: widget.sessionContext,
+      qualityLabel: widget.playbackSource.qualityLabel,
+      streamHost: streamHost,
+      statusText: _statusMessage(),
+      statusLabel: _statusLabel(),
+      timeline: _PlaybackTimeline(
+        player: _player!,
+        textColor: Theme.of(context).colorScheme.onSurface,
+        onInteractionStart: _showControls,
+        onInteractionEnd: _scheduleControlsAutoHide,
       ),
+      primaryActionLabel: widget.canToggleFullscreen && !widget.isFullscreen
+          ? 'Enter Fullscreen'
+          : 'Open Series',
+      onPrimaryAction: widget.canToggleFullscreen && !widget.isFullscreen
+          ? widget.onToggleFullscreen
+          : () async {
+              _openSeriesHub();
+            },
+      secondaryActionLabel: widget.canToggleFullscreen && !widget.isFullscreen
+          ? 'Open Series'
+          : null,
+      onSecondaryAction: widget.canToggleFullscreen && !widget.isFullscreen
+          ? _openSeriesHub
+          : null,
     );
-  }
-}
 
-class _EpisodeCompletionCard extends StatelessWidget {
-  const _EpisodeCompletionCard({required this.sessionContext});
-
-  final PlayerScreenContext sessionContext;
-
-  @override
-  Widget build(BuildContext context) {
-    return _InfoCard(
-      title: 'Episode Finished',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'This episode is complete. Return to your previous screen or open the series page to continue with the next available episode.',
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+    if (showHandsetCompanion) {
+      return ColoredBox(
+        color: Colors.black,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
             children: [
-              FilledButton.tonalIcon(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Back'),
-              ),
-              TextButton.icon(
-                onPressed: () => context.push(
-                  AppRoutePaths.seriesDetails(sessionContext.seriesId),
+              AspectRatio(aspectRatio: 16 / 9, child: stage),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    MediaQuery.paddingOf(context).bottom + 16,
+                  ),
+                  child: companionPanel,
                 ),
-                icon: const Icon(Icons.menu_book_rounded),
-                label: const Text('Open Series'),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
+        ),
+      );
+    }
 
-class _SessionHeader extends StatelessWidget {
-  const _SessionHeader({required this.sessionContext});
+    if (isHandset) {
+      return ColoredBox(color: Colors.black, child: stage);
+    }
 
-  final PlayerScreenContext sessionContext;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Now Watching',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            sessionContext.seriesTitle,
-            style: theme.textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+    return ColoredBox(
+      color: Colors.black,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              _HeaderChip(
-                label: sessionContext.episodeDisplayLabel,
-                color: theme.colorScheme.primary,
-              ),
+              Expanded(child: _StageFrame(child: stage)),
+              const SizedBox(width: 16),
+              SizedBox(width: 340, child: companionPanel),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            sessionContext.episodeTitle,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
+
+  String _statusLabel() {
+    if (_isCompleted) {
+      return 'Complete';
+    }
+
+    if (_isBuffering) {
+      return 'Buffering';
+    }
+
+    if (_isPlaying) {
+      return 'Playing';
+    }
+
+    return 'Paused';
+  }
+
+  String _statusMessage() {
+    if (_isCompleted) {
+      return 'This episode is finished. Progress is stored as complete and you can exit to the series hub for the next episode.';
+    }
+
+    if (_isBuffering) {
+      return 'Playback is active, but the stream is catching up.';
+    }
+
+    if (_isPlaying) {
+      return 'Playback is active and progress continues syncing back into Continue Watching.';
+    }
+
+    return 'Playback is paused and ready to continue from the saved position.';
+  }
 }
 
-class _PlaybackVideoCard extends StatelessWidget {
-  const _PlaybackVideoCard({
+class _PlaybackStage extends StatelessWidget {
+  const _PlaybackStage({
     required this.videoController,
     required this.player,
+    required this.sessionContext,
+    required this.qualityLabel,
+    required this.isPlaying,
+    required this.isBuffering,
     required this.isCompleted,
+    required this.controlsVisible,
+    required this.canToggleFullscreen,
+    required this.isFullscreen,
+    required this.onBackRequested,
+    required this.onOpenSeriesRequested,
+    required this.onPrimaryAction,
+    required this.onSeekBackward,
+    required this.onSeekForward,
+    required this.onToggleFullscreen,
+    required this.onStageTap,
+    required this.onTimelineInteractionStart,
+    required this.onTimelineInteractionEnd,
   });
 
   final VideoController videoController;
   final Player player;
+  final PlayerScreenContext sessionContext;
+  final String qualityLabel;
+  final bool isPlaying;
+  final bool isBuffering;
   final bool isCompleted;
+  final bool controlsVisible;
+  final bool canToggleFullscreen;
+  final bool isFullscreen;
+  final Future<void> Function() onBackRequested;
+  final VoidCallback onOpenSeriesRequested;
+  final Future<void> Function() onPrimaryAction;
+  final Future<void> Function() onSeekBackward;
+  final Future<void> Function() onSeekForward;
+  final Future<void> Function() onToggleFullscreen;
+  final VoidCallback onStageTap;
+  final VoidCallback onTimelineInteractionStart;
+  final VoidCallback onTimelineInteractionEnd;
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(color: Colors.black),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Video(
-                controller: videoController,
-                controls: NoVideoControls,
-                fill: Colors.black,
-                fit: BoxFit.contain,
+    final effectiveControlsVisible =
+        controlsVisible || !isPlaying || isBuffering || isCompleted;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onStageTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const ColoredBox(color: Colors.black),
+          Video(
+            controller: videoController,
+            controls: NoVideoControls,
+            fill: Colors.black,
+            fit: BoxFit.contain,
+          ),
+          if (isBuffering)
+            const ColoredBox(
+              color: Color(0x33000000),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          IgnorePointer(
+            ignoring: !effectiveControlsVisible,
+            child: AnimatedOpacity(
+              opacity: effectiveControlsVisible ? 1 : 0,
+              duration: const Duration(milliseconds: 180),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x99000000),
+                      Color(0x22000000),
+                      Color(0x99000000),
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _OverlayIconButton(
+                              icon: Icons.arrow_back_rounded,
+                              onPressed: onBackRequested,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    sessionContext.seriesTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${sessionContext.episodeDisplayLabel} • ${sessionContext.episodeTitle}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            _OverlayIconButton(
+                              icon: Icons.menu_book_rounded,
+                              onPressed: () async => onOpenSeriesRequested(),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _OverlayTransportButton(
+                              icon: Icons.replay_10_rounded,
+                              onPressed: () async {
+                                await onSeekBackward();
+                              },
+                            ),
+                            const SizedBox(width: 20),
+                            _OverlayTransportButton(
+                              icon: isCompleted
+                                  ? Icons.replay_rounded
+                                  : isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              isPrimary: true,
+                              onPressed: () async {
+                                await onPrimaryAction();
+                              },
+                            ),
+                            const SizedBox(width: 20),
+                            _OverlayTransportButton(
+                              icon: Icons.forward_10_rounded,
+                              onPressed: () async {
+                                await onSeekForward();
+                              },
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0x73000000),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.12),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _PlaybackBadge(
+                                    label: sessionContext.episodeDisplayLabel,
+                                  ),
+                                  _PlaybackBadge(label: qualityLabel),
+                                  _PlaybackBadge(
+                                    label: isCompleted
+                                        ? 'Complete'
+                                        : isBuffering
+                                        ? 'Buffering'
+                                        : isPlaying
+                                        ? 'Playing'
+                                        : 'Paused',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              _PlaybackTimeline(
+                                player: player,
+                                textColor: Colors.white,
+                                inactiveColor: Colors.white24,
+                                onInteractionStart: onTimelineInteractionStart,
+                                onInteractionEnd: onTimelineInteractionEnd,
+                              ),
+                              if (canToggleFullscreen) ...[
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () {
+                                      unawaited(onToggleFullscreen());
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    icon: Icon(
+                                      isFullscreen
+                                          ? Icons.fullscreen_exit_rounded
+                                          : Icons.fullscreen_rounded,
+                                    ),
+                                    label: Text(
+                                      isFullscreen
+                                          ? 'Exit Fullscreen'
+                                          : 'Enter Fullscreen',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              StreamBuilder<bool>(
-                stream: player.stream.buffering,
-                initialData: false,
-                builder: (context, snapshot) {
-                  if (snapshot.data != true) {
-                    return const SizedBox.shrink();
-                  }
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-                  return const ColoredBox(
-                    color: Color(0x33000000),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                },
+class _SessionSummaryPanel extends StatelessWidget {
+  const _SessionSummaryPanel({
+    required this.sessionContext,
+    required this.qualityLabel,
+    required this.streamHost,
+    required this.statusText,
+    required this.statusLabel,
+    required this.primaryActionLabel,
+    required this.onPrimaryAction,
+    this.timeline,
+    this.secondaryActionLabel,
+    this.onSecondaryAction,
+  });
+
+  final PlayerScreenContext sessionContext;
+  final String? qualityLabel;
+  final String? streamHost;
+  final String statusText;
+  final String statusLabel;
+  final Widget? timeline;
+  final String primaryActionLabel;
+  final Future<void> Function() onPrimaryAction;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.98),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Now Watching',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
               ),
-              StreamBuilder<bool>(
-                stream: player.stream.playing,
-                initialData: true,
-                builder: (context, snapshot) {
-                  final isPlaying = snapshot.data ?? false;
-                  if (isCompleted) {
-                    return const _VideoOverlayMessage(
-                      icon: Icons.check_circle_outline_rounded,
-                      label: 'Episode complete',
-                    );
-                  }
-
-                  if (isPlaying) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return const _VideoOverlayMessage(
-                    icon: Icons.pause_circle_outline_rounded,
-                    label: 'Paused',
-                  );
+            ),
+            const SizedBox(height: 8),
+            Text(
+              sessionContext.seriesTitle,
+              style: theme.textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              sessionContext.episodeTitle,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _HeaderChip(
+                  label: sessionContext.episodeDisplayLabel,
+                  color: theme.colorScheme.primary,
+                ),
+                if (qualityLabel != null)
+                  _HeaderChip(
+                    label: qualityLabel!,
+                    color: theme.colorScheme.secondary,
+                  ),
+                if (streamHost != null && streamHost!.isNotEmpty)
+                  _HeaderChip(
+                    label: streamHost!,
+                    color: theme.colorScheme.tertiary,
+                  ),
+                _HeaderChip(
+                  label: statusLabel,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ),
+            if (timeline != null) ...[const SizedBox(height: 20), timeline!],
+            const SizedBox(height: 20),
+            Text(
+              statusText,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  unawaited(onPrimaryAction());
                 },
+                child: Text(primaryActionLabel),
+              ),
+            ),
+            if (secondaryActionLabel != null && onSecondaryAction != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: onSecondaryAction,
+                  child: Text(secondaryActionLabel!),
+                ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _PlaybackControlPanel extends StatelessWidget {
-  const _PlaybackControlPanel({
+class _PlaybackTimeline extends StatefulWidget {
+  const _PlaybackTimeline({
     required this.player,
-    required this.qualityLabel,
-    required this.streamHost,
-    required this.isCompleted,
-    required this.onPrimaryAction,
+    required this.textColor,
+    required this.onInteractionStart,
+    required this.onInteractionEnd,
+    this.inactiveColor,
   });
 
   final Player player;
-  final String qualityLabel;
-  final String? streamHost;
-  final bool isCompleted;
-  final Future<void> Function(bool isPlaying) onPrimaryAction;
+  final Color textColor;
+  final Color? inactiveColor;
+  final VoidCallback onInteractionStart;
+  final VoidCallback onInteractionEnd;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return StreamBuilder<bool>(
-      stream: player.stream.playing,
-      initialData: true,
-      builder: (context, playingSnapshot) {
-        final isPlaying = playingSnapshot.data ?? false;
-        final primaryIcon = isCompleted
-            ? Icons.replay_rounded
-            : isPlaying
-            ? Icons.pause_rounded
-            : Icons.play_arrow_rounded;
-        final primaryLabel = isCompleted
-            ? 'Replay Episode'
-            : isPlaying
-            ? 'Pause'
-            : 'Play';
-
-        return _InfoCard(
-          title: 'Controls',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => onPrimaryAction(isPlaying),
-                  icon: Icon(primaryIcon),
-                  label: Text(primaryLabel),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _PlaybackProgressSummary(player: player),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _HeaderChip(
-                    label: qualityLabel,
-                    color: theme.colorScheme.primary,
-                  ),
-                  if (streamHost != null && streamHost!.isNotEmpty)
-                    _HeaderChip(
-                      label: streamHost!,
-                      color: theme.colorScheme.secondary,
-                    ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  State<_PlaybackTimeline> createState() => _PlaybackTimelineState();
 }
 
-class _PlaybackProgressSummary extends StatelessWidget {
-  const _PlaybackProgressSummary({required this.player});
-
-  final Player player;
+class _PlaybackTimelineState extends State<_PlaybackTimeline> {
+  double? _dragValue;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return StreamBuilder<Duration>(
-      stream: player.stream.position,
+      stream: widget.player.stream.position,
       initialData: Duration.zero,
       builder: (context, positionSnapshot) {
         return StreamBuilder<Duration>(
-          stream: player.stream.duration,
+          stream: widget.player.stream.duration,
           initialData: Duration.zero,
           builder: (context, durationSnapshot) {
             final position = positionSnapshot.data ?? Duration.zero;
             final duration = durationSnapshot.data ?? Duration.zero;
             final hasDuration = duration > Duration.zero;
-            final progressValue = hasDuration
+            final currentValue = hasDuration
                 ? (position.inMilliseconds / duration.inMilliseconds).clamp(
                     0.0,
                     1.0,
                   )
-                : null;
+                : 0.0;
+            final displayedValue = _dragValue ?? currentValue;
+            final displayedPosition = hasDuration
+                ? Duration(
+                    milliseconds: (duration.inMilliseconds * displayedValue)
+                        .round(),
+                  )
+                : position;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Progress', style: theme.textTheme.labelLarge),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progressValue,
-                    minHeight: 8,
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    overlayShape: SliderComponentShape.noOverlay,
+                    activeTrackColor: widget.textColor,
+                    inactiveTrackColor:
+                        widget.inactiveColor ??
+                        widget.textColor.withValues(alpha: 0.24),
+                    thumbColor: widget.textColor,
+                  ),
+                  child: Slider(
+                    value: displayedValue,
+                    onChangeStart: hasDuration
+                        ? (_) => widget.onInteractionStart()
+                        : null,
+                    onChanged: hasDuration
+                        ? (value) {
+                            setState(() {
+                              _dragValue = value;
+                            });
+                          }
+                        : null,
+                    onChangeEnd: hasDuration
+                        ? (value) async {
+                            final target = Duration(
+                              milliseconds: (duration.inMilliseconds * value)
+                                  .round(),
+                            );
+                            await widget.player.seek(target);
+                            if (!mounted) {
+                              return;
+                            }
+                            setState(() {
+                              _dragValue = null;
+                            });
+                            widget.onInteractionEnd();
+                          }
+                        : null,
                   ),
                 ),
-                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        _formatPlaybackDuration(position),
-                        style: theme.textTheme.bodyMedium,
+                        _formatPlaybackDuration(displayedPosition),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: widget.textColor,
+                        ),
                       ),
                     ),
                     Text(
                       hasDuration
                           ? _formatPlaybackDuration(duration)
-                          : 'Live duration unknown',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                          : 'Duration unknown',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: widget.textColor.withValues(alpha: 0.78),
                       ),
                     ),
                   ],
@@ -860,36 +1312,25 @@ class _PlaybackProgressSummary extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.title, required this.child});
+class _StageFrame extends StatelessWidget {
+  const _StageFrame({required this.child});
 
-  final String title;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 12),
-          child,
-        ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(color: Colors.black),
+        child: child,
       ),
     );
   }
 }
 
-class _VideoStageCard extends StatelessWidget {
-  const _VideoStageCard({
+class _StageContent extends StatelessWidget {
+  const _StageContent({
     required this.title,
     required this.message,
     required this.child,
@@ -901,38 +1342,32 @@ class _VideoStageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: ColoredBox(
-          color: Colors.black,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  child,
-                  const SizedBox(height: 16),
-                  Text(
-                    title,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    message,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              child,
+              const SizedBox(height: 20),
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                textAlign: TextAlign.center,
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
@@ -940,32 +1375,103 @@ class _VideoStageCard extends StatelessWidget {
   }
 }
 
-class _PlaybackStateBadgeRow extends StatelessWidget {
-  const _PlaybackStateBadgeRow({
-    required this.isPlaying,
-    required this.isBuffering,
-    required this.isCompleted,
-  });
+class _RouteBackButton extends StatelessWidget {
+  const _RouteBackButton({required this.onPressed});
 
-  final bool isPlaying;
-  final bool isBuffering;
-  final bool isCompleted;
+  final Future<void> Function() onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final badges = <Widget>[
-      if (isCompleted)
-        _HeaderChip(label: 'Complete', color: theme.colorScheme.tertiary)
-      else if (isBuffering)
-        _HeaderChip(label: 'Buffering', color: theme.colorScheme.secondary)
-      else if (isPlaying)
-        _HeaderChip(label: 'Playing', color: theme.colorScheme.primary)
-      else
-        _HeaderChip(label: 'Paused', color: theme.colorScheme.secondary),
-    ];
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: _OverlayIconButton(
+        icon: Icons.arrow_back_rounded,
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
 
-    return Wrap(spacing: 8, runSpacing: 8, children: badges);
+class _OverlayIconButton extends StatelessWidget {
+  const _OverlayIconButton({required this.icon, required this.onPressed});
+
+  final IconData icon;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Color(0x66000000),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        onPressed: () {
+          unawaited(onPressed());
+        },
+        icon: Icon(icon, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _OverlayTransportButton extends StatelessWidget {
+  const _OverlayTransportButton({
+    required this.icon,
+    required this.onPressed,
+    this.isPrimary = false,
+  });
+
+  final IconData icon;
+  final Future<void> Function() onPressed;
+  final bool isPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isPrimary ? Colors.white : const Color(0x66000000),
+        shape: BoxShape.circle,
+      ),
+      child: SizedBox(
+        width: isPrimary ? 68 : 56,
+        height: isPrimary ? 68 : 56,
+        child: IconButton(
+          onPressed: () {
+            unawaited(onPressed());
+          },
+          icon: Icon(
+            icon,
+            color: isPrimary ? Colors.black : Colors.white,
+            size: isPrimary ? 32 : 24,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaybackBadge extends StatelessWidget {
+  const _PlaybackBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(color: Colors.white),
+      ),
+    );
   }
 }
 
@@ -987,42 +1493,6 @@ class _HeaderChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
-      ),
-    );
-  }
-}
-
-class _VideoOverlayMessage extends StatelessWidget {
-  const _VideoOverlayMessage({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0x33000000),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xB2000000),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(color: Colors.white),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

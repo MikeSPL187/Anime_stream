@@ -143,4 +143,16 @@ class _FakeWatchSystemRepository implements WatchSystemRepository {
   Future<void> saveEpisodeProgress(EpisodeProgress progress) async {
     savedProgress = progress;
   }
+
+  @override
+  Future<void> markEpisodeWatched({
+    required String seriesId,
+    required String episodeId,
+  }) async {}
+
+  @override
+  Future<void> markEpisodeUnwatched({
+    required String seriesId,
+    required String episodeId,
+  }) async {}
 }

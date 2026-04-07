@@ -258,6 +258,131 @@ void main() {
       },
     );
   });
+
+  group('LocalWatchSystemRepository watched state operations', () {
+    test(
+      'markEpisodeWatched persists completed progress for the requested episode',
+      () async {
+        final tempDirectory = await Directory.systemTemp.createTemp(
+          'watch-state-operations-test',
+        );
+        addTearDown(() async {
+          if (await tempDirectory.exists()) {
+            await tempDirectory.delete(recursive: true);
+          }
+        });
+
+        final progressStore = JsonEpisodeProgressStore(
+          directoryProvider: () async => tempDirectory,
+          relativeFilePath: 'episode_progress.json',
+        );
+        final repository = LocalWatchSystemRepository(
+          episodeProgressStore: progressStore,
+          seriesRepository: _FakeSeriesRepository(
+            seriesById: {
+              'series-1': const Series(
+                id: 'series-1',
+                slug: 'frieren',
+                title: 'Frieren',
+                availability: AvailabilityState(),
+              ),
+            },
+            episodesBySeriesId: {
+              'series-1': const [
+                Episode(
+                  id: 'episode-2',
+                  seriesId: 'series-1',
+                  sortOrder: 2,
+                  numberLabel: '2',
+                  title: 'A New Journey',
+                  duration: Duration(minutes: 24),
+                ),
+              ],
+            },
+          ),
+        );
+
+        await repository.markEpisodeWatched(
+          seriesId: 'series-1',
+          episodeId: 'episode-2',
+        );
+
+        final progress = await repository.getEpisodeProgress(
+          seriesId: 'series-1',
+          episodeId: 'episode-2',
+        );
+
+        expect(progress, isNotNull);
+        expect(progress!.isCompleted, isTrue);
+        expect(progress.position, const Duration(minutes: 24));
+        expect(progress.totalDuration, const Duration(minutes: 24));
+      },
+    );
+
+    test('markEpisodeUnwatched removes stored watched state', () async {
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'watch-state-reset-test',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final progressStore = JsonEpisodeProgressStore(
+        directoryProvider: () async => tempDirectory,
+        relativeFilePath: 'episode_progress.json',
+      );
+      await progressStore.writeAll({
+        'series-1::episode-2': EpisodeProgress(
+          seriesId: 'series-1',
+          episodeId: 'episode-2',
+          position: const Duration(minutes: 24),
+          totalDuration: const Duration(minutes: 24),
+          isCompleted: true,
+          updatedAt: DateTime(2026, 4, 7, 14, 0),
+        ).toJson(),
+      });
+
+      final repository = LocalWatchSystemRepository(
+        episodeProgressStore: progressStore,
+        seriesRepository: _FakeSeriesRepository(
+          seriesById: {
+            'series-1': const Series(
+              id: 'series-1',
+              slug: 'frieren',
+              title: 'Frieren',
+              availability: AvailabilityState(),
+            ),
+          },
+          episodesBySeriesId: {
+            'series-1': const [
+              Episode(
+                id: 'episode-2',
+                seriesId: 'series-1',
+                sortOrder: 2,
+                numberLabel: '2',
+                title: 'A New Journey',
+                duration: Duration(minutes: 24),
+              ),
+            ],
+          },
+        ),
+      );
+
+      await repository.markEpisodeUnwatched(
+        seriesId: 'series-1',
+        episodeId: 'episode-2',
+      );
+
+      final progress = await repository.getEpisodeProgress(
+        seriesId: 'series-1',
+        episodeId: 'episode-2',
+      );
+
+      expect(progress, isNull);
+    });
+  });
 }
 
 class _FakeSeriesRepository implements SeriesRepository {

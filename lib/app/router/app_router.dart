@@ -2,12 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'app_shell.dart';
-import '../../features/home/home_screen.dart';
-import '../../features/history/history_screen.dart';
-import '../../features/player/player_screen.dart';
-import '../../features/player/player_screen_context.dart';
 import '../../features/browse/browse_screen.dart';
 import '../../features/catalog/catalog_screen.dart';
+import '../../features/history/history_screen.dart';
+import '../../features/home/home_screen.dart';
+import '../../features/my_lists/my_lists_screen.dart';
+import '../../features/player/player_screen.dart';
+import '../../features/player/player_screen_context.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/series/series_screen.dart';
 import '../../features/watchlist/watchlist_screen.dart';
@@ -26,8 +27,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const HomeScreen(),
           ),
           GoRoute(
+            path: AppRoutePaths.browse,
+            builder: (context, state) => const BrowseScreen(),
+          ),
+          GoRoute(
             path: AppRoutePaths.search,
             builder: (context, state) => const SearchScreen(),
+          ),
+          GoRoute(
+            path: AppRoutePaths.myLists,
+            builder: (context, state) => const MyListsScreen(),
           ),
         ],
       ),
@@ -53,10 +62,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const WatchlistScreen(),
       ),
       GoRoute(
-        path: AppRoutePaths.browse,
-        builder: (context, state) => const BrowseScreen(),
-      ),
-      GoRoute(
         path: AppRoutePaths.catalog,
         builder: (context, state) => const CatalogScreen(),
       ),
@@ -70,11 +75,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
 abstract final class AppRoutePaths {
   static const home = '/';
+  static const browse = '/browse';
   static const search = '/search';
+  static const myLists = '/my-lists';
   static const series = '/series/:id';
   static const player = '/player';
   static const watchlist = '/watchlist';
-  static const browse = '/browse';
   static const catalog = '/catalog';
   static const history = '/history';
 

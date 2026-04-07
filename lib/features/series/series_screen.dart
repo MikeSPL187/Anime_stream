@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/router/app_router.dart';
 import '../../app/series/series_details_data.dart';
 import '../../app/series/series_providers.dart';
+import '../../app/watch/watch_state_operation_providers.dart';
 import '../../app/watchlist/watchlist_providers.dart';
 import '../../domain/models/episode.dart';
 import '../../domain/models/episode_progress.dart';
@@ -510,7 +511,7 @@ class _EpisodesSection extends StatelessWidget {
                 _EpisodesSectionLead(
                   message: sectionSubtitle,
                   actionLabel:
-                      'Tap any episode to open playback. Progress comes back here and to Home.',
+                      'Tap any episode to open playback. Use the episode menu to mark it watched or unwatched.',
                 ),
                 const SizedBox(height: 16),
                 for (var index = 0; index < episodes.length; index++) ...[
@@ -557,7 +558,7 @@ class _EpisodesSection extends StatelessWidget {
   }
 }
 
-class _EpisodeRow extends StatelessWidget {
+class _EpisodeRow extends ConsumerWidget {
   const _EpisodeRow({
     required this.series,
     required this.episode,
@@ -571,7 +572,7 @@ class _EpisodeRow extends StatelessWidget {
   final _EpisodeActionHint? actionHint;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final episodeLabel = 'Episode ${episode.numberLabel}';
     final resolvedTitle = episode.title.trim().isEmpty
@@ -633,14 +634,23 @@ class _EpisodeRow extends StatelessWidget {
                 ? null
                 : Border.all(color: rowBorderColor),
           );
+    final watchStateOperation = ref.watch(
+      seriesWatchStateOperationsControllerProvider(series.id),
+    );
+    final isMutatingWatchState = watchStateOperation.isLoading;
+    final menuAction = savedProgress?.isCompleted == true
+        ? _EpisodeRowMenuAction.markUnwatched
+        : _EpisodeRowMenuAction.markWatched;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          _openEpisodeInPlayer(context, series: series, episode: episode);
-        },
+        onTap: isMutatingWatchState
+            ? null
+            : () {
+                _openEpisodeInPlayer(context, series: series, episode: episode);
+              },
         child: Container(
           decoration: rowDecoration,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -736,15 +746,83 @@ class _EpisodeRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
+              PopupMenuButton<_EpisodeRowMenuAction>(
+                enabled: !isMutatingWatchState,
+                tooltip: 'Episode actions',
+                onSelected: (action) async {
+                  await _handleEpisodeMenuAction(context, ref, action);
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem<_EpisodeRowMenuAction>(
+                    value: menuAction,
+                    child: Text(menuAction.label),
+                  ),
+                ],
+                icon: isMutatingWatchState
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.more_vert_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _handleEpisodeMenuAction(
+    BuildContext context,
+    WidgetRef ref,
+    _EpisodeRowMenuAction action,
+  ) async {
+    final controller = ref.read(
+      seriesWatchStateOperationsControllerProvider(series.id).notifier,
+    );
+
+    try {
+      switch (action) {
+        case _EpisodeRowMenuAction.markWatched:
+          await controller.markEpisodeWatched(episode.id);
+        case _EpisodeRowMenuAction.markUnwatched:
+          await controller.markEpisodeUnwatched(episode.id);
+      }
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not update watched state for Episode ${episode.numberLabel}.\n$error',
+            ),
+          ),
+        );
+      return;
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    final message = switch (action) {
+      _EpisodeRowMenuAction.markWatched =>
+        'Episode ${episode.numberLabel} marked as watched.',
+      _EpisodeRowMenuAction.markUnwatched =>
+        'Episode ${episode.numberLabel} reset to unwatched.',
+    };
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -816,6 +894,15 @@ class _EpisodeActionHint {
 }
 
 enum _EpisodeActionHintTone { primary, secondary }
+
+enum _EpisodeRowMenuAction {
+  markWatched('Mark as Watched'),
+  markUnwatched('Mark as Unwatched');
+
+  const _EpisodeRowMenuAction(this.label);
+
+  final String label;
+}
 
 class _EpisodesSectionLead extends StatelessWidget {
   const _EpisodesSectionLead({
@@ -1094,7 +1181,7 @@ class _SectionCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
-              ...?trailing == null ? null : [trailing!],
+              ?trailing,
             ],
           ),
           const SizedBox(height: 12),

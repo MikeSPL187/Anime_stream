@@ -184,6 +184,51 @@ class LocalWatchSystemRepository implements WatchSystemRepository {
     await _episodeProgressStore.writeAll(storedEntries);
   }
 
+  @override
+  Future<void> markEpisodeWatched({
+    required String seriesId,
+    required String episodeId,
+  }) async {
+    final episode = await _findEpisode(seriesId, episodeId);
+    if (episode == null || !_isMeaningfulPlaybackEpisode(episode)) {
+      throw StateError(
+        'Episode $episodeId for series $seriesId is unavailable for watched state updates.',
+      );
+    }
+
+    final existingProgress = await getEpisodeProgress(
+      seriesId: seriesId,
+      episodeId: episodeId,
+    );
+    final resolvedTotalDuration = episode.duration ?? existingProgress?.totalDuration;
+    final resolvedPosition = resolvedTotalDuration ?? Duration.zero;
+
+    await saveEpisodeProgress(
+      EpisodeProgress(
+        seriesId: seriesId,
+        episodeId: episodeId,
+        position: resolvedPosition,
+        totalDuration: resolvedTotalDuration,
+        isCompleted: true,
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
+  Future<void> markEpisodeUnwatched({
+    required String seriesId,
+    required String episodeId,
+  }) async {
+    final storedEntries = Map<String, dynamic>.from(
+      await _episodeProgressStore.readAll(),
+    );
+    storedEntries.remove(
+      _buildKey(seriesId: seriesId, episodeId: episodeId),
+    );
+    await _episodeProgressStore.writeAll(storedEntries);
+  }
+
   String _buildKey({required String seriesId, required String episodeId}) {
     return '$seriesId::$episodeId';
   }
@@ -237,6 +282,17 @@ class LocalWatchSystemRepository implements WatchSystemRepository {
 
   bool _isMeaningfulPlaybackEpisode(Episode episode) {
     return episode.availability.status == AvailabilityStatus.available;
+  }
+
+  Future<Episode?> _findEpisode(String seriesId, String episodeId) async {
+    final episodes = await _seriesRepository.getEpisodes(seriesId);
+    for (final episode in episodes) {
+      if (episode.id == episodeId) {
+        return episode;
+      }
+    }
+
+    return null;
   }
 
   Future<_SeriesWatchPayload?> _loadSeriesWatchPayload(String seriesId) async {

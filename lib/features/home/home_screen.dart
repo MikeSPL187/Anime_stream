@@ -16,26 +16,7 @@ class HomeScreen extends ConsumerWidget {
     final continueWatching = ref.watch(homeContinueWatchingProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            onPressed: () => context.push(AppRoutePaths.browse),
-            tooltip: 'Browse catalog',
-            icon: const Icon(Icons.grid_view_rounded),
-          ),
-          IconButton(
-            onPressed: () => context.push(AppRoutePaths.history),
-            tooltip: 'Watch history',
-            icon: const Icon(Icons.history_rounded),
-          ),
-          IconButton(
-            onPressed: () => context.push(AppRoutePaths.watchlist),
-            tooltip: 'Watchlist',
-            icon: const Icon(Icons.bookmark_outline_rounded),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Home')),
       body: featuredSeries.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Center(

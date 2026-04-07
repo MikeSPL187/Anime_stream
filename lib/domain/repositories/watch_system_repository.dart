@@ -17,4 +17,14 @@ abstract interface class WatchSystemRepository {
   });
 
   Future<void> saveEpisodeProgress(EpisodeProgress progress);
+
+  Future<void> markEpisodeWatched({
+    required String seriesId,
+    required String episodeId,
+  });
+
+  Future<void> markEpisodeUnwatched({
+    required String seriesId,
+    required String episodeId,
+  });
 }

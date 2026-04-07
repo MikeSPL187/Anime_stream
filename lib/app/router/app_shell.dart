@@ -18,7 +18,9 @@ class AppShell extends StatelessWidget {
         onDestinationSelected: (index) {
           final targetLocation = switch (index) {
             0 => AppRoutePaths.home,
-            1 => AppRoutePaths.search,
+            1 => AppRoutePaths.browse,
+            2 => AppRoutePaths.search,
+            3 => AppRoutePaths.myLists,
             _ => AppRoutePaths.home,
           };
 
@@ -35,9 +37,19 @@ class AppShell extends StatelessWidget {
             label: 'Home',
           ),
           NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore_rounded),
+            label: 'Browse',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.search_outlined),
             selectedIcon: Icon(Icons.search_rounded),
             label: 'Search',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bookmarks_outlined),
+            selectedIcon: Icon(Icons.bookmarks_rounded),
+            label: 'My Lists',
           ),
         ],
       ),
@@ -45,8 +57,16 @@ class AppShell extends StatelessWidget {
   }
 
   int get _selectedIndex {
-    if (location == AppRoutePaths.search) {
+    if (location == AppRoutePaths.browse) {
       return 1;
+    }
+
+    if (location == AppRoutePaths.search) {
+      return 2;
+    }
+
+    if (location == AppRoutePaths.myLists) {
+      return 3;
     }
 
     return 0;

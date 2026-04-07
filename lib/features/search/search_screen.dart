@@ -577,9 +577,9 @@ class _SearchIntroCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextButton.icon(
-              onPressed: () => context.push(AppRoutePaths.browse),
-              icon: const Icon(Icons.grid_view_rounded),
-              label: const Text('Browse catalog instead'),
+              onPressed: () => context.go(AppRoutePaths.browse),
+              icon: const Icon(Icons.explore_rounded),
+              label: const Text('Go to Browse'),
             ),
           ],
         ),
