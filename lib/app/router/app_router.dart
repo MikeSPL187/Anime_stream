@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'app_shell.dart';
 import '../../features/browse/browse_screen.dart';
 import '../../features/catalog/catalog_screen.dart';
 import '../../features/history/history_screen.dart';
@@ -11,7 +10,9 @@ import '../../features/player/player_screen.dart';
 import '../../features/player/player_screen_context.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/series/series_screen.dart';
+import '../../features/settings/settings_screen.dart';
 import '../../features/watchlist/watchlist_screen.dart';
+import 'app_shell.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -37,6 +38,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutePaths.myLists,
             builder: (context, state) => const MyListsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutePaths.settings,
+            builder: (context, state) => const SettingsScreen(),
           ),
         ],
       ),
@@ -78,6 +83,7 @@ abstract final class AppRoutePaths {
   static const browse = '/browse';
   static const search = '/search';
   static const myLists = '/my-lists';
+  static const settings = '/settings';
   static const series = '/series/:id';
   static const player = '/player';
   static const watchlist = '/watchlist';

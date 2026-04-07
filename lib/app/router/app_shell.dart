@@ -21,6 +21,7 @@ class AppShell extends StatelessWidget {
             1 => AppRoutePaths.browse,
             2 => AppRoutePaths.search,
             3 => AppRoutePaths.myLists,
+            4 => AppRoutePaths.settings,
             _ => AppRoutePaths.home,
           };
 
@@ -51,6 +52,11 @@ class AppShell extends StatelessWidget {
             selectedIcon: Icon(Icons.bookmarks_rounded),
             label: 'My Lists',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings_rounded),
+            label: 'Settings',
+          ),
         ],
       ),
     );
@@ -67,6 +73,10 @@ class AppShell extends StatelessWidget {
 
     if (location == AppRoutePaths.myLists) {
       return 3;
+    }
+
+    if (location == AppRoutePaths.settings) {
+      return 4;
     }
 
     return 0;

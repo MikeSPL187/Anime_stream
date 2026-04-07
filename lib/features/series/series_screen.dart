@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -50,13 +51,13 @@ class _SeriesPage extends StatelessWidget {
     final series = details.series;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        _IdentitySection(series: series),
-        const SizedBox(height: 16),
-        _SaveIntentSection(series: series),
+        _IdentityHeroSection(details: details),
         const SizedBox(height: 16),
         _PrimaryWatchActionSection(details: details),
+        const SizedBox(height: 16),
+        _SaveIntentSection(series: series),
         const SizedBox(height: 24),
         _EpisodesSection(details: details),
         const SizedBox(height: 24),
@@ -70,80 +71,109 @@ class _SeriesPage extends StatelessWidget {
   }
 }
 
-class _IdentitySection extends StatelessWidget {
-  const _IdentitySection({required this.series});
+class _IdentityHeroSection extends StatelessWidget {
+  const _IdentityHeroSection({required this.details});
 
-  final Series series;
+  final SeriesDetailsData details;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final summary = <String>[
+    final series = details.series;
+    final metadata = <String>[
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
+      '${details.episodes.length} episodes',
     ].join('  •  ');
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.45,
-        ),
-        borderRadius: BorderRadius.circular(16),
+    final stats = <_HeroStat>[
+      _HeroStat(
+        label: 'In progress',
+        value: '${details.inProgressEpisodeCount}',
+        color: theme.colorScheme.primary,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _IdentityArtworkHero(
-            imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
-            fallbackLabel: series.title,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Series',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.primary,
+      _HeroStat(
+        label: 'Completed',
+        value: '${details.completedEpisodeCount}',
+        color: theme.colorScheme.tertiary,
+      ),
+      _HeroStat(
+        label: 'Available',
+        value: '${details.episodes.length}',
+        color: theme.colorScheme.secondary,
+      ),
+    ];
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _HeroBannerArtwork(
+              imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
+              fallbackLabel: series.title,
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _IdentityPoster(
-                imageUrl: series.posterImageUrl,
-                fallbackLabel: series.title,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(series.title, style: theme.textTheme.headlineSmall),
-                    if ((series.originalTitle ?? '').trim().isNotEmpty &&
-                        series.originalTitle != series.title) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        series.originalTitle!,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _IdentityPoster(
+                  imageUrl: series.posterImageUrl,
+                  fallbackLabel: series.title,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HeroTag(
+                        label: 'Series hub',
+                        color: theme.colorScheme.primary,
                       ),
-                    ],
-                    if (summary.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Text(
-                        summary,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        series.title,
+                        style: theme.textTheme.headlineMedium,
                       ),
+                      if ((series.originalTitle ?? '').trim().isNotEmpty &&
+                          series.originalTitle != series.title) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          series.originalTitle!,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                      if (metadata.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          metadata,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: stats
+                  .map((stat) => _HeroStatCard(stat: stat))
+                  .toList(growable: false),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -182,7 +212,7 @@ class _PrimaryWatchActionSection extends StatelessWidget {
         color: theme.colorScheme.primary,
       ),
       SeriesPrimaryWatchActionKind.continueEpisode => (
-        label: 'Up Next',
+        label: 'Up next',
         color: theme.colorScheme.secondary,
       ),
       SeriesPrimaryWatchActionKind.startWatching => (
@@ -190,7 +220,7 @@ class _PrimaryWatchActionSection extends StatelessWidget {
         color: theme.colorScheme.primary,
       ),
       SeriesPrimaryWatchActionKind.endOfAvailableContent => (
-        label: 'Up to Date',
+        label: 'Up to date',
         color: theme.colorScheme.tertiary,
       ),
       SeriesPrimaryWatchActionKind.unavailable => (
@@ -198,26 +228,7 @@ class _PrimaryWatchActionSection extends StatelessWidget {
         color: theme.colorScheme.error,
       ),
     };
-    final summaryChips = <Widget>[
-      _WatchSummaryChip(
-        label: '${details.episodes.length} episodes',
-        color: theme.colorScheme.primary,
-      ),
-      if (details.inProgressEpisodeCount > 0)
-        _WatchSummaryChip(
-          label: '${details.inProgressEpisodeCount} in progress',
-          color: theme.colorScheme.primary,
-        ),
-      if (details.completedEpisodeCount > 0)
-        _WatchSummaryChip(
-          label: '${details.completedEpisodeCount} completed',
-          color: theme.colorScheme.tertiary,
-        ),
-    ];
-    final latestActivityText = switch ((
-      latestProgress,
-      latestProgressEpisode,
-    )) {
+    final latestActivityText = switch ((latestProgress, latestProgressEpisode)) {
       (final progress?, final episode?) when progress.isCompleted =>
         'Latest activity: completed Episode ${episode.numberLabel}',
       (final progress?, final episode?) =>
@@ -234,31 +245,39 @@ class _PrimaryWatchActionSection extends StatelessWidget {
     };
 
     return _SectionCard(
-      title: 'Watch Now',
+      title: 'Watch now',
+      visualDensity: _SectionDensity.highlighted,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _WatchStateBadge(label: actionBadge.label, color: actionBadge.color),
-          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _WatchStateBadge(
+                label: actionBadge.label,
+                color: actionBadge.color,
+              ),
+              _WatchStateBadge(
+                label: '${details.episodes.length} available',
+                color: theme.colorScheme.secondary,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Text(action.label, style: theme.textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
             supportingText,
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            latestActivityText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          const SizedBox(height: 16),
+          _WatchActionSummaryStrip(
+            latestActivityText: latestActivityText,
+            transitionText: transitionText,
           ),
-          if (summaryChips.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Wrap(spacing: 8, runSpacing: 8, children: summaryChips),
-          ],
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -282,14 +301,51 @@ class _PrimaryWatchActionSection extends StatelessWidget {
               label: Text(action.label),
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            transitionText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _WatchActionSummaryStrip extends StatelessWidget {
+  const _WatchActionSummaryStrip({
+    required this.latestActivityText,
+    required this.transitionText,
+  });
+
+  final String latestActivityText;
+  final String transitionText;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.64),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              latestActivityText,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              transitionText,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -308,7 +364,7 @@ class _SaveIntentSection extends ConsumerWidget {
     );
 
     return _SectionCard(
-      title: 'Save for Later',
+      title: 'Save for later',
       child: savedState.when(
         loading: () => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,7 +414,7 @@ class _SaveIntentSection extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _WatchStateBadge(
-                  label: 'Saved for Later',
+                  label: 'Saved for later',
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(height: 12),
@@ -444,14 +500,16 @@ class _MetadataSection extends StatelessWidget {
     ];
 
     return _SectionCard(
-      title: 'About This Series',
+      title: 'About this series',
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: metadata
             .map(
-              (item) =>
-                  Chip(label: Text(item), visualDensity: VisualDensity.compact),
+              (item) => Chip(
+                label: Text(item),
+                visualDensity: VisualDensity.compact,
+              ),
             )
             .toList(growable: false),
       ),
@@ -469,7 +527,6 @@ class _SynopsisSection extends StatelessWidget {
     return _SectionCard(title: 'Story', child: Text(synopsis));
   }
 }
-
 
 class _EpisodesSection extends StatefulWidget {
   const _EpisodesSection({required this.details});
@@ -524,6 +581,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
         label: '${episodes.length} available',
         color: theme.colorScheme.primary,
       ),
+      visualDensity: _SectionDensity.highlighted,
       child: episodes.isEmpty
           ? const Text('Episodes are not available yet.')
           : Column(
@@ -575,7 +633,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
                   _EpisodeBrowserEmptyState(filter: _selectedFilter)
                 else
                   for (var index = 0; index < visibleEpisodes.length; index++) ...[
-                    if (index > 0) const Divider(height: 1),
+                    if (index > 0) const SizedBox(height: 12),
                     _EpisodeRow(
                       series: series,
                       episode: visibleEpisodes[index],
@@ -646,50 +704,53 @@ class _EpisodeBrowserControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(12),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Episode browser', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 4),
-          Text(
-            'Focus the list on your next watch decision or reverse the order for catch-up browsing.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Episode browser', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Focus the list on your next watch decision or reverse the order for catch-up browsing.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final filter in _EpisodeListFilter.values)
-                ChoiceChip(
-                  label: Text('${filter.label} (${counts[filter] ?? 0})'),
-                  selected: filter == selectedFilter,
-                  onSelected: (_) => onFilterSelected(filter),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final sortOrder in _EpisodeSortOrder.values)
-                ChoiceChip(
-                  label: Text(sortOrder.label),
-                  selected: sortOrder == selectedSortOrder,
-                  onSelected: (_) => onSortOrderSelected(sortOrder),
-                ),
-            ],
-          ),
-        ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final filter in _EpisodeListFilter.values)
+                  ChoiceChip(
+                    label: Text('${filter.label} (${counts[filter] ?? 0})'),
+                    selected: filter == selectedFilter,
+                    onSelected: (_) => onFilterSelected(filter),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final sortOrder in _EpisodeSortOrder.values)
+                  ChoiceChip(
+                    label: Text(sortOrder.label),
+                    selected: sortOrder == selectedSortOrder,
+                    onSelected: (_) => onSortOrderSelected(sortOrder),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -717,8 +778,9 @@ class _EpisodeBrowserEmptyState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
         border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         message,
@@ -729,8 +791,6 @@ class _EpisodeBrowserEmptyState extends StatelessWidget {
     );
   }
 }
-
-
 
 class _EpisodeRow extends ConsumerWidget {
   const _EpisodeRow({
@@ -789,25 +849,6 @@ class _EpisodeRow extends ConsumerWidget {
       _EpisodeActionHintTone.primary => theme.colorScheme.primary,
       null => null,
     };
-    final rowBackgroundColor = actionHint != null
-        ? actionHintColor!.withValues(alpha: 0.06)
-        : savedProgress != null
-        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.28)
-        : null;
-    final rowBorderColor = actionHint != null
-        ? actionHintColor!.withValues(alpha: 0.24)
-        : savedProgress != null
-        ? theme.colorScheme.outlineVariant
-        : null;
-    final rowDecoration = rowBackgroundColor == null
-        ? null
-        : BoxDecoration(
-            color: rowBackgroundColor,
-            borderRadius: BorderRadius.circular(16),
-            border: rowBorderColor == null
-                ? null
-                : Border.all(color: rowBorderColor),
-          );
     final watchStateOperation = ref.watch(
       seriesWatchStateOperationsControllerProvider(series.id),
     );
@@ -816,161 +857,165 @@ class _EpisodeRow extends ConsumerWidget {
         ? _EpisodeRowMenuAction.markUnwatched
         : _EpisodeRowMenuAction.markWatched;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: isMutatingWatchState
-            ? null
-            : () {
-                _openEpisodeInPlayer(context, series: series, episode: episode);
-              },
-        child: Container(
-          decoration: rowDecoration,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _EpisodeNumberTile(
-                numberLabel: episode.numberLabel,
-                color: actionHintColor ?? theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _EpisodeWatchStatus(
-                          label: episodeLabel,
-                          color: theme.colorScheme.secondary,
-                        ),
-                        if (actionHint != null)
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: actionHint != null
+            ? actionHintColor!.withValues(alpha: 0.08)
+            : savedProgress != null
+                ? theme.colorScheme.surfaceContainerLow
+                : theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: actionHint != null
+              ? actionHintColor!.withValues(alpha: 0.3)
+              : theme.colorScheme.outlineVariant,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: isMutatingWatchState
+              ? null
+              : () {
+                  _openEpisodeInPlayer(context, series: series, episode: episode);
+                },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _EpisodeNumberTile(
+                  numberLabel: episode.numberLabel,
+                  color: actionHintColor ?? theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
                           _EpisodeWatchStatus(
-                            label: actionHint!.label,
-                            color: actionHintColor!,
+                            label: episodeLabel,
+                            color: theme.colorScheme.secondary,
                           ),
-                        if (watchStatus != null)
-                          _EpisodeWatchStatus(
-                            label: watchStatus.label,
-                            color: watchStatus.color,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(resolvedTitle, style: theme.textTheme.titleMedium),
-                    if (progressLabel != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        progressLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                          if (actionHint != null)
+                            _EpisodeWatchStatus(
+                              label: actionHint!.label,
+                              color: actionHintColor!,
+                            ),
+                          if (watchStatus != null)
+                            _EpisodeWatchStatus(
+                              label: watchStatus.label,
+                              color: watchStatus.color,
+                            ),
+                        ],
                       ),
-                    ],
-                    if (progressFraction != null) ...[
                       const SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: progressFraction,
-                          minHeight: 6,
-                        ),
-                      ),
-                    ],
-                    if (subtitleParts.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        subtitleParts.join('  •  '),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    if ((episode.synopsis ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        episode.synopsis!,
-                        style: theme.textTheme.bodyMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.play_circle_outline_rounded,
-                              size: 18,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Open in player',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (savedProgress?.isCompleted == true)
-                          Text(
-                            'Marked watched',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.tertiary,
-                            ),
-                          )
-                        else if (savedProgress != null)
-                          Text(
-                            'Resume-ready',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
+                      Text(resolvedTitle, style: theme.textTheme.titleMedium),
+                      if (progressLabel != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          progressLabel,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
+                        ),
                       ],
+                      if (progressFraction != null) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: progressFraction,
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
+                      if (subtitleParts.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          subtitleParts.join('  •  '),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                      if ((episode.synopsis ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          episode.synopsis!,
+                          style: theme.textTheme.bodyMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          FilledButton.tonalIcon(
+                            onPressed: isMutatingWatchState
+                                ? null
+                                : () => _openEpisodeInPlayer(
+                                      context,
+                                      series: series,
+                                      episode: episode,
+                                    ),
+                            icon: const Icon(Icons.play_arrow_rounded),
+                            label: const Text('Play episode'),
+                          ),
+                          if (savedProgress?.isCompleted == true)
+                            _EpisodeInfoPill(
+                              label: 'Marked watched',
+                              color: theme.colorScheme.tertiary,
+                            )
+                          else if (savedProgress != null)
+                            _EpisodeInfoPill(
+                              label: 'Resume-ready',
+                              color: theme.colorScheme.primary,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                PopupMenuButton<_EpisodeRowMenuAction>(
+                  enabled: !isMutatingWatchState,
+                  tooltip: 'Episode actions',
+                  onSelected: (action) async {
+                    await _handleEpisodeMenuAction(context, ref, action);
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem<_EpisodeRowMenuAction>(
+                      value: _EpisodeRowMenuAction.play,
+                      child: Text('Play episode'),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem<_EpisodeRowMenuAction>(
+                      value: watchedMenuAction,
+                      child: Text(watchedMenuAction.label),
                     ),
                   ],
+                  icon: isMutatingWatchState
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          Icons.more_vert_rounded,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              PopupMenuButton<_EpisodeRowMenuAction>(
-                enabled: !isMutatingWatchState,
-                tooltip: 'Episode actions',
-                onSelected: (action) async {
-                  await _handleEpisodeMenuAction(context, ref, action);
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem<_EpisodeRowMenuAction>(
-                    value: _EpisodeRowMenuAction.play,
-                    child: Text('Play episode'),
-                  ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem<_EpisodeRowMenuAction>(
-                    value: watchedMenuAction,
-                    child: Text(watchedMenuAction.label),
-                  ),
-                ],
-                icon: isMutatingWatchState
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.more_vert_rounded,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1037,6 +1082,29 @@ class _EpisodeRow extends ConsumerWidget {
   }
 }
 
+class _EpisodeInfoPill extends StatelessWidget {
+  const _EpisodeInfoPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+      ),
+    );
+  }
+}
+
 void _openEpisodeInPlayer(
   BuildContext context, {
   required Series series,
@@ -1097,7 +1165,6 @@ class _WatchStateBadge extends StatelessWidget {
   }
 }
 
-
 enum _EpisodeListFilter {
   all('All'),
   continueWatching('Continue'),
@@ -1150,31 +1217,32 @@ class _EpisodesSectionLead extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(12),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.32,
-        ),
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            actionLabel,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.primary,
+            const SizedBox(height: 8),
+            Text(
+              actionLabel,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1191,11 +1259,11 @@ class _EpisodeNumberTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      width: 64,
+      width: 68,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Column(
@@ -1241,8 +1309,8 @@ class _EpisodeWatchStatus extends StatelessWidget {
   }
 }
 
-class _IdentityArtworkHero extends StatelessWidget {
-  const _IdentityArtworkHero({
+class _HeroBannerArtwork extends StatelessWidget {
+  const _HeroBannerArtwork({
     required this.imageUrl,
     required this.fallbackLabel,
   });
@@ -1253,7 +1321,7 @@ class _IdentityArtworkHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(20),
       child: AspectRatio(
         aspectRatio: 16 / 9,
         child: _SeriesArtworkImage(
@@ -1276,9 +1344,9 @@ class _IdentityPoster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        width: 104,
+        width: 110,
         child: AspectRatio(
           aspectRatio: 2 / 3,
           child: _SeriesArtworkImage(
@@ -1392,33 +1460,121 @@ class _SeriesArtworkFallback extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child, this.trailing});
+  const _SectionCard({
+    required this.title,
+    required this.child,
+    this.trailing,
+    this.visualDensity = _SectionDensity.standard,
+  });
 
   final String title;
   final Widget child;
   final Widget? trailing;
+  final _SectionDensity visualDensity;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final highlighted = visualDensity == _SectionDensity.highlighted;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: highlighted
+            ? theme.colorScheme.surfaceContainerLow
+            : theme.colorScheme.surface,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(highlighted ? 24 : 22),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(highlighted ? 18 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+                if (trailing != null) ...[
+                  const SizedBox(width: 12),
+                  trailing!,
+                ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _SectionDensity { standard, highlighted }
+
+class _HeroTag extends StatelessWidget {
+  const _HeroTag({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(color: color),
+      ),
+    );
+  }
+}
+
+class _HeroStat {
+  const _HeroStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+}
+
+class _HeroStatCard extends StatelessWidget {
+  const _HeroStatCard({required this.stat});
+
+  final _HeroStat stat;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: 132,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        color: stat.color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: stat.color.withValues(alpha: 0.24)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
-              ?trailing,
-            ],
+          Text(
+            stat.label,
+            style: theme.textTheme.labelMedium?.copyWith(color: stat.color),
           ),
-          const SizedBox(height: 12),
-          child,
+          const SizedBox(height: 6),
+          Text(
+            stat.value,
+            style: theme.textTheme.headlineSmall,
+          ),
         ],
       ),
     );

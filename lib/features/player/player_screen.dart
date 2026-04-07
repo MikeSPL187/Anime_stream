@@ -13,6 +13,10 @@ import '../../app/player/player_progress_providers.dart';
 import '../../app/router/app_router.dart';
 import 'player_screen_context.dart';
 
+const _playerAccent = Color(0xFFFF7A00);
+const _playerOutline = Color(0x26FFFFFF);
+const _playerOverlaySurface = Color(0x7A0D0D0D);
+
 class PlayerScreen extends ConsumerWidget {
   const PlayerScreen({super.key, this.sessionContext});
 
@@ -188,17 +192,33 @@ class _MissingSessionContextState extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'No watch session was provided.\nReturn to a series and choose an episode to enter the player.',
-              textAlign: TextAlign.center,
+      child: _PlayerGlassPanel(
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.96),
+        padding: const EdgeInsets.all(28),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _PlayerStateIcon(
+                  icon: Icons.play_circle_outline_rounded,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Player Unavailable',
+                  style: theme.textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'No watch session was provided. Return to a series and choose an episode to enter playback.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
         ),
@@ -239,8 +259,14 @@ class _PlayerResolutionStage extends StatelessWidget {
       onPrimaryAction: onBackRequested,
     );
 
-    return ColoredBox(
-      color: Colors.black,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black, Color(0xFF080808)],
+        ),
+      ),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -752,9 +778,17 @@ class _ResolvedPlaybackSurfaceState
           : null,
     );
 
+    const playerBackdrop = BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Colors.black, Color(0xFF080808)],
+      ),
+    );
+
     if (showHandsetCompanion) {
-      return ColoredBox(
-        color: Colors.black,
+      return DecoratedBox(
+        decoration: playerBackdrop,
         child: SafeArea(
           bottom: false,
           child: Column(
@@ -778,11 +812,11 @@ class _ResolvedPlaybackSurfaceState
     }
 
     if (isHandset) {
-      return ColoredBox(color: Colors.black, child: stage);
+      return DecoratedBox(decoration: playerBackdrop, child: stage);
     }
 
-    return ColoredBox(
-      color: Colors.black,
+    return DecoratedBox(
+      decoration: playerBackdrop,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -790,7 +824,7 @@ class _ResolvedPlaybackSurfaceState
             children: [
               Expanded(child: _StageFrame(child: stage)),
               const SizedBox(width: 16),
-              SizedBox(width: 340, child: companionPanel),
+              SizedBox(width: 348, child: companionPanel),
             ],
           ),
         ),
@@ -878,6 +912,13 @@ class _PlaybackStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveControlsVisible =
         controlsVisible || !isPlaying || isBuffering || isCompleted;
+    final playbackStateLabel = isCompleted
+        ? 'Complete'
+        : isBuffering
+        ? 'Buffering'
+        : isPlaying
+        ? 'Playing'
+        : 'Paused';
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -908,102 +949,127 @@ class _PlaybackStage extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Color(0x99000000),
-                      Color(0x22000000),
-                      Color(0x99000000),
+                      Color(0xCC000000),
+                      Color(0x15000000),
+                      Color(0xD9000000),
                     ],
                   ),
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                     child: Column(
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _OverlayIconButton(
-                              icon: Icons.arrow_back_rounded,
-                              onPressed: onBackRequested,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        _PlayerGlassPanel(
+                          backgroundColor: const Color(0x5E111111),
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _OverlayIconButton(
+                                icon: Icons.arrow_back_rounded,
+                                onPressed: onBackRequested,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const _PlayerOverlayEyebrow(
+                                      label: 'Now playing',
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      sessionContext.seriesTitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${sessionContext.episodeDisplayLabel} • ${sessionContext.episodeTitle}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Colors.white70,
+                                            height: 1.25,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              _OverlayIconButton(
+                                icon: Icons.menu_book_rounded,
+                                onPressed: () async => onOpenSeriesRequested(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        _PlayerGlassPanel(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 18,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    sessionContext.seriesTitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                  _OverlayTransportButton(
+                                    icon: Icons.replay_10_rounded,
+                                    onPressed: () async {
+                                      await onSeekBackward();
+                                    },
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${sessionContext.episodeDisplayLabel} • ${sessionContext.episodeTitle}',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(color: Colors.white70),
+                                  const SizedBox(width: 20),
+                                  _OverlayTransportButton(
+                                    icon: isCompleted
+                                        ? Icons.replay_rounded
+                                        : isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    isPrimary: true,
+                                    onPressed: () async {
+                                      await onPrimaryAction();
+                                    },
+                                  ),
+                                  const SizedBox(width: 20),
+                                  _OverlayTransportButton(
+                                    icon: Icons.forward_10_rounded,
+                                    onPressed: () async {
+                                      await onSeekForward();
+                                    },
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            _OverlayIconButton(
-                              icon: Icons.menu_book_rounded,
-                              onPressed: () async => onOpenSeriesRequested(),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _OverlayTransportButton(
-                              icon: Icons.replay_10_rounded,
-                              onPressed: () async {
-                                await onSeekBackward();
-                              },
-                            ),
-                            const SizedBox(width: 20),
-                            _OverlayTransportButton(
-                              icon: isCompleted
-                                  ? Icons.replay_rounded
-                                  : isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              isPrimary: true,
-                              onPressed: () async {
-                                await onPrimaryAction();
-                              },
-                            ),
-                            const SizedBox(width: 20),
-                            _OverlayTransportButton(
-                              icon: Icons.forward_10_rounded,
-                              onPressed: () async {
-                                await onSeekForward();
-                              },
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0x73000000),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.12),
-                            ),
+                              const SizedBox(height: 10),
+                              Text(
+                                isCompleted
+                                    ? 'Playback finished'
+                                    : isPlaying
+                                    ? 'Tap to pause or scrub'
+                                    : 'Ready to resume',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: Colors.white70),
+                              ),
+                            ],
                           ),
+                        ),
+                        const Spacer(),
+                        _PlayerGlassPanel(
+                          padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1015,18 +1081,10 @@ class _PlaybackStage extends StatelessWidget {
                                     label: sessionContext.episodeDisplayLabel,
                                   ),
                                   _PlaybackBadge(label: qualityLabel),
-                                  _PlaybackBadge(
-                                    label: isCompleted
-                                        ? 'Complete'
-                                        : isBuffering
-                                        ? 'Buffering'
-                                        : isPlaying
-                                        ? 'Playing'
-                                        : 'Paused',
-                                  ),
+                                  _PlaybackBadge(label: playbackStateLabel),
                                 ],
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
                               _PlaybackTimeline(
                                 player: player,
                                 textColor: Colors.white,
@@ -1034,30 +1092,39 @@ class _PlaybackStage extends StatelessWidget {
                                 onInteractionStart: onTimelineInteractionStart,
                                 onInteractionEnd: onTimelineInteractionEnd,
                               ),
-                              if (canToggleFullscreen) ...[
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton.icon(
-                                    onPressed: () {
-                                      unawaited(onToggleFullscreen());
-                                    },
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    icon: Icon(
-                                      isFullscreen
-                                          ? Icons.fullscreen_exit_rounded
-                                          : Icons.fullscreen_rounded,
-                                    ),
-                                    label: Text(
-                                      isFullscreen
-                                          ? 'Exit Fullscreen'
-                                          : 'Enter Fullscreen',
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Player controls stay minimal so playback remains dominant.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: Colors.white70),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  if (canToggleFullscreen)
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        unawaited(onToggleFullscreen());
+                                      },
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      icon: Icon(
+                                        isFullscreen
+                                            ? Icons.fullscreen_exit_rounded
+                                            : Icons.fullscreen_rounded,
+                                      ),
+                                      label: Text(
+                                        isFullscreen
+                                            ? 'Exit Fullscreen'
+                                            : 'Enter Fullscreen',
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -1103,90 +1170,98 @@ class _SessionSummaryPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.98),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Now Watching',
-              style: theme.textTheme.labelLarge?.copyWith(
+    return _PlayerGlassPanel(
+      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.98),
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _PlayerOverlayEyebrow(label: 'Now watching'),
+          const SizedBox(height: 8),
+          Text(
+            sessionContext.seriesTitle,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            sessionContext.episodeTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _HeaderChip(
+                label: sessionContext.episodeDisplayLabel,
                 color: theme.colorScheme.primary,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              sessionContext.seriesTitle,
-              style: theme.textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              sessionContext.episodeTitle,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
+              if (qualityLabel != null)
                 _HeaderChip(
-                  label: sessionContext.episodeDisplayLabel,
-                  color: theme.colorScheme.primary,
+                  label: qualityLabel!,
+                  color: theme.colorScheme.secondary,
                 ),
-                if (qualityLabel != null)
-                  _HeaderChip(
-                    label: qualityLabel!,
-                    color: theme.colorScheme.secondary,
-                  ),
-                if (streamHost != null && streamHost!.isNotEmpty)
-                  _HeaderChip(
-                    label: streamHost!,
-                    color: theme.colorScheme.tertiary,
-                  ),
+              if (streamHost != null && streamHost!.isNotEmpty)
                 _HeaderChip(
-                  label: statusLabel,
-                  color: theme.colorScheme.primary,
+                  label: streamHost!,
+                  color: theme.colorScheme.tertiary,
                 ),
-              ],
-            ),
-            if (timeline != null) ...[const SizedBox(height: 20), timeline!],
-            const SizedBox(height: 20),
-            Text(
-              statusText,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  unawaited(onPrimaryAction());
-                },
-                child: Text(primaryActionLabel),
-              ),
-            ),
-            if (secondaryActionLabel != null && onSecondaryAction != null) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: onSecondaryAction,
-                  child: Text(secondaryActionLabel!),
-                ),
+              _HeaderChip(
+                label: statusLabel,
+                color: theme.colorScheme.primary,
               ),
             ],
+          ),
+          if (timeline != null) ...[
+            const SizedBox(height: 22),
+            _PlayerGlassPanel(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.5),
+              padding: const EdgeInsets.all(14),
+              child: timeline!,
+            ),
           ],
-        ),
+          const SizedBox(height: 20),
+          Text(
+            'Playback status',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            statusText,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                unawaited(onPrimaryAction());
+              },
+              child: Text(primaryActionLabel),
+            ),
+          ),
+          if (secondaryActionLabel != null && onSecondaryAction != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onSecondaryAction,
+                child: Text(secondaryActionLabel!),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1320,9 +1395,19 @@ class _StageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
       child: DecoratedBox(
-        decoration: const BoxDecoration(color: Colors.black),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          border: Border.all(color: _playerOutline),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x55000000),
+              blurRadius: 28,
+              offset: Offset(0, 18),
+            ),
+          ],
+        ),
         child: child,
       ),
     );
@@ -1347,30 +1432,114 @@ class _StageContent extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              child,
-              const SizedBox(height: 20),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                textAlign: TextAlign.center,
-              ),
-            ],
+          child: _PlayerGlassPanel(
+            backgroundColor: _playerOverlaySurface,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _PlayerOverlayEyebrow(label: 'Playback'),
+                const SizedBox(height: 14),
+                _PlayerStateIcon(child: child),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                    height: 1.35,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PlayerGlassPanel extends StatelessWidget {
+  const _PlayerGlassPanel({
+    required this.child,
+    this.backgroundColor,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  final Widget child;
+  final Color? backgroundColor;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: backgroundColor ?? _playerOverlaySurface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _playerOutline),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 18,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(padding: padding, child: child),
+    );
+  }
+}
+
+class _PlayerOverlayEyebrow extends StatelessWidget {
+  const _PlayerOverlayEyebrow({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label.toUpperCase(),
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: _playerAccent,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+}
+
+class _PlayerStateIcon extends StatelessWidget {
+  const _PlayerStateIcon({this.icon, this.child});
+
+  final IconData? icon;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 68,
+      height: 68,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: child ??
+          Icon(icon, color: Colors.white, size: 34),
     );
   }
 }
@@ -1401,9 +1570,10 @@ class _OverlayIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Color(0x66000000),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
         shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: IconButton(
         onPressed: () {
@@ -1430,12 +1600,33 @@ class _OverlayTransportButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: isPrimary ? Colors.white : const Color(0x66000000),
+        gradient: isPrimary
+            ? const LinearGradient(
+                colors: [Color(0xFFFF8F1F), Color(0xFFFF6A00)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
+            : null,
+        color: isPrimary ? null : Colors.white.withValues(alpha: 0.08),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: isPrimary
+              ? Colors.transparent
+              : Colors.white.withValues(alpha: 0.12),
+        ),
+        boxShadow: isPrimary
+            ? const [
+                BoxShadow(
+                  color: Color(0x55FF7A00),
+                  blurRadius: 22,
+                  offset: Offset(0, 10),
+                ),
+              ]
+            : null,
       ),
       child: SizedBox(
-        width: isPrimary ? 68 : 56,
-        height: isPrimary ? 68 : 56,
+        width: isPrimary ? 72 : 56,
+        height: isPrimary ? 72 : 56,
         child: IconButton(
           onPressed: () {
             unawaited(onPressed());
@@ -1443,7 +1634,7 @@ class _OverlayTransportButton extends StatelessWidget {
           icon: Icon(
             icon,
             color: isPrimary ? Colors.black : Colors.white,
-            size: isPrimary ? 32 : 24,
+            size: isPrimary ? 34 : 24,
           ),
         ),
       ),
@@ -1461,15 +1652,18 @@ class _PlaybackBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Text(
         label,
         style: Theme.of(
           context,
-        ).textTheme.labelMedium?.copyWith(color: Colors.white),
+        ).textTheme.labelMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -1486,13 +1680,16 @@ class _HeaderChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: 0.24)),
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
