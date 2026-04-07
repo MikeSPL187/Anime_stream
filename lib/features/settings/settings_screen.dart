@@ -13,98 +13,81 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          const _SectionHeader(
-            title: 'Playback',
-            description:
-                'Keep this route focused on real app behavior and utility controls, not service theater.',
-          ),
-          const SizedBox(height: 12),
-          const _SurfaceGroup(
+          const _SummaryStrip(),
+          const SizedBox(height: 20),
+          _SectionBlock(
+            title: 'Library',
             children: [
-              _SettingsInfoTile(
-                icon: Icons.fullscreen_rounded,
-                title: 'Fullscreen-first player',
-                message:
-                    'Handset playback opens as an immersive watch surface with fullscreen-aware route behavior.',
-              ),
-              Divider(height: 1),
-              _SettingsInfoTile(
-                icon: Icons.save_rounded,
-                title: 'Automatic progress sync',
-                message:
-                    'Playback progress is stored automatically so Continue Watching and Series can restore your place.',
-              ),
-              Divider(height: 1),
-              _SettingsInfoTile(
-                icon: Icons.download_rounded,
-                title: 'Offline downloads are active',
-                message:
-                    'Episode downloads are supported from the Series screen. A dedicated downloads destination is being hardened separately.',
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeader(
-            title: 'Library shortcuts',
-            description:
-                'Jump directly into the list surfaces that already exist in the repository.',
-          ),
-          const SizedBox(height: 12),
-          _SurfaceGroup(
-            children: [
-              _SettingsActionTile(
+              _ActionRow(
                 icon: Icons.bookmarks_rounded,
                 title: 'Open My Lists',
-                message:
-                    'Go to saved titles and completed watch history in one place.',
+                subtitle: 'Saved titles, downloads, and watch history.',
                 onTap: () => context.go(AppRoutePaths.myLists),
               ),
-              const Divider(height: 1),
-              _SettingsActionTile(
+              const Divider(height: 20),
+              _ActionRow(
                 icon: Icons.bookmark_outline_rounded,
                 title: 'Open Watchlist',
-                message:
-                    'Review titles you saved for later outside active playback.',
+                subtitle: 'Saved-for-later titles outside active playback.',
                 onTap: () => context.push(AppRoutePaths.watchlist),
               ),
-              const Divider(height: 1),
-              _SettingsActionTile(
+              const Divider(height: 20),
+              _ActionRow(
+                icon: Icons.download_rounded,
+                title: 'Open Downloads',
+                subtitle: 'Offline-ready episodes and active download states.',
+                onTap: () => context.push(AppRoutePaths.downloads),
+              ),
+              const Divider(height: 20),
+              _ActionRow(
                 icon: Icons.history_rounded,
-                title: 'Open Watch History',
-                message:
-                    'Review completed viewing activity kept separate from Continue Watching.',
+                title: 'Open History',
+                subtitle: 'Completed episodes kept separate from re-entry.',
                 onTap: () => context.push(AppRoutePaths.history),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          const _SectionHeader(
-            title: 'About this build',
-            description:
-                'Keep only the app truths that are real for this single-user product.',
-          ),
-          const SizedBox(height: 12),
-          const _SurfaceGroup(
+          const SizedBox(height: 28),
+          const _SectionBlock(
+            title: 'Playback',
             children: [
-              _SettingsInfoTile(
+              _InfoRow(
+                icon: Icons.fullscreen_rounded,
+                title: 'Fullscreen-first handset player',
+                subtitle: 'Phone playback opens as an immersive watch surface.',
+              ),
+              Divider(height: 20),
+              _InfoRow(
+                icon: Icons.save_rounded,
+                title: 'Automatic progress sync',
+                subtitle:
+                    'Playback progress is stored for Continue Watching and Series.',
+              ),
+              Divider(height: 20),
+              _InfoRow(
+                icon: Icons.offline_pin_rounded,
+                title: 'Offline playback supported',
+                subtitle:
+                    'Downloaded episodes can open through the player when ready.',
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          const _SectionBlock(
+            title: 'App scope',
+            children: [
+              _InfoRow(
                 icon: Icons.person_outline_rounded,
-                title: 'Single-user anime app',
-                message:
-                    'This build intentionally excludes profiles, subscriptions, and service-scale account systems.',
+                title: 'Single-user product',
+                subtitle:
+                    'No profiles, subscriptions, or service-scale account systems.',
               ),
-              Divider(height: 1),
-              _SettingsInfoTile(
+              Divider(height: 20),
+              _InfoRow(
                 icon: Icons.cloud_outlined,
-                title: 'AniLibria source of truth',
-                message:
-                    'Catalog discovery, series details, playback resolution, and offline packaging rely on AniLibria-backed flows.',
-              ),
-              Divider(height: 1),
-              _SettingsInfoTile(
-                icon: Icons.flag_outlined,
-                title: 'Current corrective phase',
-                message:
-                    'Navigation and mobile primitives are being reset toward a tighter content-first streaming grammar.',
+                title: 'AniLibria-backed flows',
+                subtitle:
+                    'Catalog, series, playback resolution, and offline packaging use AniLibria-backed data.',
               ),
             ],
           ),
@@ -114,11 +97,30 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.description});
+class _SummaryStrip extends StatelessWidget {
+  const _SummaryStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _CountBadge(label: 'Utility route', color: colorScheme.primary),
+        _CountBadge(label: 'Player ready', color: colorScheme.secondary),
+        _CountBadge(label: 'Offline active', color: colorScheme.tertiary),
+      ],
+    );
+  }
+}
+
+class _SectionBlock extends StatelessWidget {
+  const _SectionBlock({required this.title, required this.children});
 
   final String title;
-  final String description;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
@@ -128,11 +130,15 @@ class _SectionHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 4),
-        Text(
-          description,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        const SizedBox(height: 12),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(children: children),
           ),
         ),
       ],
@@ -140,79 +146,57 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _SurfaceGroup extends StatelessWidget {
-  const _SurfaceGroup({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(children: children),
-    );
-  }
-}
-
-class _SettingsInfoTile extends StatelessWidget {
-  const _SettingsInfoTile({
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
     required this.icon,
     required this.title,
-    required this.message,
+    required this.subtitle,
   });
 
   final IconData icon;
   final String title;
-  final String message;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _IconTile(icon: icon),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _IconTile(icon: icon),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _SettingsActionTile extends StatelessWidget {
-  const _SettingsActionTile({
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
     required this.icon,
     required this.title,
-    required this.message,
+    required this.subtitle,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String message;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
@@ -222,37 +206,37 @@ class _SettingsActionTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _IconTile(icon: icon),
-              const SizedBox(width: 12),
-              Expanded(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _IconTile(icon: icon),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title, style: theme.textTheme.titleMedium),
                     const SizedBox(height: 4),
                     Text(
-                      message,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );
@@ -275,6 +259,29 @@ class _IconTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, color: theme.colorScheme.primary),
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+      ),
     );
   }
 }
