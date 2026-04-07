@@ -53,16 +53,16 @@ class _SeriesPage extends StatelessWidget {
     final series = details.series;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
         _SeriesHero(details: details),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         _PrimaryWatchPanel(details: details),
-        const SizedBox(height: 20),
+        const SizedBox(height: 22),
         _EpisodesSection(details: details),
-        const SizedBox(height: 20),
+        const SizedBox(height: 22),
         _SaveIntentSection(series: series),
-        const SizedBox(height: 20),
+        const SizedBox(height: 22),
         _SeriesDetailsSection(
           series: series,
           episodeCount: details.episodes.length,
@@ -104,9 +104,9 @@ class _SeriesHero extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           child: SizedBox(
-            height: 220,
+            height: 272,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -123,12 +123,20 @@ class _SeriesHero extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withValues(alpha: 0.08),
-                          Colors.black.withValues(alpha: 0.18),
-                          Colors.black.withValues(alpha: 0.88),
+                          Colors.black.withValues(alpha: 0.04),
+                          Colors.black.withValues(alpha: 0.14),
+                          Colors.black.withValues(alpha: 0.92),
                         ],
                       ),
                     ),
+                  ),
+                ),
+                const Positioned(
+                  left: 16,
+                  top: 16,
+                  child: _OverlayPill(
+                    label: 'Series hub',
+                    icon: Icons.play_circle_fill_rounded,
                   ),
                 ),
                 Positioned(
@@ -138,13 +146,24 @@ class _SeriesHero extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (facts.isNotEmpty)
+                        Text(
+                          facts,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      if (facts.isNotEmpty) const SizedBox(height: 8),
                       Text(
                         series.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.headlineSmall?.copyWith(
+                        style: theme.textTheme.headlineMedium?.copyWith(
                           color: Colors.white,
-                          height: 1.05,
+                          height: 1.02,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                       if ((series.originalTitle ?? '').trim().isNotEmpty &&
@@ -159,14 +178,15 @@ class _SeriesHero extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (facts.isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
                         Text(
-                          facts,
-                          maxLines: 2,
+                          series.synopsis!,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.76),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            height: 1.26,
                           ),
                         ),
                       ],
@@ -225,25 +245,52 @@ class _PrimaryWatchPanel extends StatelessWidget {
       _ => 'Choose a specific episode below or start from the main action.',
     };
 
+    final stateLabel = switch (action.kind) {
+      SeriesPrimaryWatchActionKind.resumeEpisode => 'Resume',
+      SeriesPrimaryWatchActionKind.continueEpisode => 'Up next',
+      SeriesPrimaryWatchActionKind.startWatching => 'Start',
+      SeriesPrimaryWatchActionKind.endOfAvailableContent => 'Complete',
+      SeriesPrimaryWatchActionKind.unavailable => 'Unavailable',
+    };
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Watch now', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text(action.label, style: theme.textTheme.titleLarge),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _HeaderChip(
+                  label: stateLabel,
+                  color: theme.colorScheme.primary,
+                ),
+                _HeaderChip(
+                  label: '${details.episodes.length} episodes',
+                  color: theme.colorScheme.secondary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              action.label,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1.05,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               supportingText,
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                height: 1.25,
+                height: 1.28,
               ),
             ),
             const SizedBox(height: 10),
@@ -253,7 +300,7 @@ class _PrimaryWatchPanel extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -277,9 +324,10 @@ class _PrimaryWatchPanel extends StatelessWidget {
                   }),
                   label: Text(action.label),
                 ),
-                TextButton(
+                TextButton.icon(
                   onPressed: () => context.push(AppRoutePaths.watchlist),
-                  child: const Text('Open Watchlist'),
+                  icon: const Icon(Icons.bookmark_outline_rounded),
+                  label: const Text('Open Watchlist'),
                 ),
               ],
             ),
@@ -306,7 +354,7 @@ class _SaveIntentSection extends ConsumerWidget {
       loading: () => DecoratedBox(
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: const Padding(
           padding: EdgeInsets.all(14),
@@ -326,7 +374,7 @@ class _SaveIntentSection extends ConsumerWidget {
       error: (error, stackTrace) => DecoratedBox(
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -342,7 +390,7 @@ class _SaveIntentSection extends ConsumerWidget {
         return DecoratedBox(
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
           ),
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -516,6 +564,13 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
               label: Text(_selectedSortOrder.label),
             ),
           ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Choose where to watch next. Progress, offline state, and episode actions stay attached to each row.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 10),
         SingleChildScrollView(
@@ -1081,6 +1136,66 @@ void _openEpisodeInPlayer(
       episodeTitle: episode.title,
     ),
   );
+}
+
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderChip extends StatelessWidget {
+  const _HeaderChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
 }
 
 enum _EpisodeListFilter { all, continueWatching, unwatched, watched }
