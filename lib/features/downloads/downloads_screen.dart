@@ -44,7 +44,7 @@ class DownloadsScreen extends ConsumerWidget {
               icon: Icons.download_outlined,
               title: 'No downloads yet',
               message:
-                  'Download episodes from a series page to create an offline library.',
+                  'Download episodes from a series page to build an offline library.',
               action: TextButton.icon(
                 onPressed: () => context.go(AppRoutePaths.myLists),
                 icon: const Icon(Icons.bookmarks_outlined),
@@ -53,10 +53,10 @@ class DownloadsScreen extends ConsumerWidget {
             );
           }
 
-          final availableOffline = entries
+          final offlineReady = entries
               .where((e) => e.isPlayableOffline)
               .toList(growable: false);
-          final activeTransfers = entries
+          final active = entries
               .where(
                 (e) =>
                     e.status == DownloadStatus.downloading ||
@@ -73,33 +73,31 @@ class DownloadsScreen extends ConsumerWidget {
             children: [
               _SummaryStrip(
                 totalCount: entries.length,
-                offlineCount: availableOffline.length,
-                activeCount: activeTransfers.length,
+                offlineCount: offlineReady.length,
+                activeCount: active.length,
                 failedCount: failed.length,
               ),
-              const SizedBox(height: 24),
-              if (availableOffline.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              if (offlineReady.isNotEmpty) ...[
                 _DownloadsSection(
                   title: 'Available offline',
-                  description:
-                      'Ready to open through the player without going back online.',
-                  entries: availableOffline,
+                  subtitle: 'Ready to open directly in the player.',
+                  entries: offlineReady,
                 ),
                 const SizedBox(height: 28),
               ],
-              if (activeTransfers.isNotEmpty) ...[
+              if (active.isNotEmpty) ...[
                 _DownloadsSection(
                   title: 'Active downloads',
-                  description:
-                      'Queued, downloading, and paused offline transfers.',
-                  entries: activeTransfers,
+                  subtitle: 'Queued, downloading, and paused transfers.',
+                  entries: active,
                 ),
                 const SizedBox(height: 28),
               ],
               if (failed.isNotEmpty)
                 _DownloadsSection(
                   title: 'Needs attention',
-                  description: 'Retry failed offline downloads or remove them.',
+                  subtitle: 'Retry or remove failed offline entries.',
                   entries: failed,
                 ),
             ],
@@ -126,7 +124,6 @@ class _SummaryStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -144,34 +141,39 @@ class _SummaryStrip extends StatelessWidget {
 class _DownloadsSection extends StatelessWidget {
   const _DownloadsSection({
     required this.title,
-    required this.description,
+    required this.subtitle,
     required this.entries,
   });
 
   final String title;
-  final String description;
+  final String subtitle;
   final List<DownloadEntry> entries;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
-          description,
+          subtitle,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 14),
-        for (var index = 0; index < entries.length; index++) ...[
-          if (index > 0) const Divider(height: 24),
-          _DownloadRow(entry: entries[index]),
-        ],
+        const SizedBox(height: 12),
+        _SurfaceBlock(
+          child: Column(
+            children: [
+              for (var index = 0; index < entries.length; index++) ...[
+                if (index > 0) const Divider(height: 20),
+                _DownloadRow(entry: entries[index]),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -201,15 +203,13 @@ class _DownloadRow extends ConsumerWidget {
           _DownloadRowFallback(entry: entry, isBusy: actionState.isLoading),
       data: (details) {
         final episode = _episodeForEntry(details.episodes, entry.episodeId);
-        final seriesTitle = details.series.title;
-        final posterUrl = details.series.posterImageUrl;
         final episodeLabel = episode == null
             ? 'Episode ${entry.episodeId}'
             : 'Episode ${episode.numberLabel}';
         final episodeTitle = episode == null || episode.title.trim().isEmpty
             ? episodeLabel
             : episode.title;
-        final contextForPlayer = PlayerScreenContext(
+        final playerContext = PlayerScreenContext(
           seriesId: details.series.id,
           seriesTitle: details.series.title,
           episodeId: entry.episodeId,
@@ -220,15 +220,14 @@ class _DownloadRow extends ConsumerWidget {
         return _DownloadRowScaffold(
           entry: entry,
           isBusy: actionState.isLoading,
-          seriesTitle: seriesTitle,
-          posterUrl: posterUrl,
+          seriesTitle: details.series.title,
+          posterUrl: details.series.posterImageUrl,
           episodeLabel: episodeLabel,
           episodeTitle: episodeTitle,
           onOpenSeries: () =>
               context.push(AppRoutePaths.seriesDetails(entry.seriesId)),
           onPlayOffline: entry.isPlayableOffline
-              ? () =>
-                    context.push(AppRoutePaths.player, extra: contextForPlayer)
+              ? () => context.push(AppRoutePaths.player, extra: playerContext)
               : null,
         );
       },
@@ -338,16 +337,13 @@ class _DownloadRowScaffold extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Badge(
-                label: _downloadStatusLabel(entry),
-                color: _downloadStatusColor(context, entry.status),
-              ),
-              const SizedBox(height: 10),
               Text(seriesTitle, style: theme.textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '$episodeLabel • ${entry.selectedQuality}',
-                style: theme.textTheme.bodyMedium?.copyWith(
+                '$episodeLabel • ${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -371,7 +367,7 @@ class _DownloadRowScaffold extends ConsumerWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -456,6 +452,24 @@ class _DownloadsState extends StatelessWidget {
   }
 }
 
+class _SurfaceBlock extends StatelessWidget {
+  const _SurfaceBlock({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+}
+
 class _Poster extends StatelessWidget {
   const _Poster({required this.imageUrl, required this.label});
 
@@ -468,9 +482,9 @@ class _Poster extends StatelessWidget {
     final trimmedUrl = imageUrl?.trim();
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        width: 84,
+        width: 72,
         child: AspectRatio(
           aspectRatio: 2 / 3,
           child: trimmedUrl == null || trimmedUrl.isEmpty
@@ -494,9 +508,8 @@ class _Poster extends StatelessWidget {
                         ],
                       );
                     },
-                    errorBuilder: (context, error, stackTrace) {
-                      return _PosterFallback(label: label);
-                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        _PosterFallback(label: label),
                   ),
                 ),
         ),
@@ -580,16 +593,5 @@ String _downloadStatusLabel(DownloadEntry entry) {
     DownloadStatus.queued => 'Queued',
     DownloadStatus.paused => 'Paused',
     DownloadStatus.failed => 'Failed',
-  };
-}
-
-Color _downloadStatusColor(BuildContext context, DownloadStatus status) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return switch (status) {
-    DownloadStatus.completed => colorScheme.primary,
-    DownloadStatus.downloading ||
-    DownloadStatus.queued => colorScheme.secondary,
-    DownloadStatus.paused => colorScheme.tertiary,
-    DownloadStatus.failed => colorScheme.error,
   };
 }

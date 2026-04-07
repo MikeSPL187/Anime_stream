@@ -40,14 +40,12 @@ class MyListsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          const _LeadHeader(),
-          const SizedBox(height: 20),
           _SummaryStrip(
             watchlistCount: watchlist.asData?.value.length,
-            historyCount: history.asData?.value.length,
             downloadsCount: downloads.asData?.value.length,
+            historyCount: history.asData?.value.length,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _WatchlistSection(watchlist: watchlist),
           const SizedBox(height: 28),
           _DownloadsSection(downloads: downloads),
@@ -59,75 +57,40 @@ class MyListsScreen extends ConsumerWidget {
   }
 }
 
-class _LeadHeader extends StatelessWidget {
-  const _LeadHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'My Lists'.toUpperCase(),
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Saved, offline, and watched',
-          style: theme.textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Keep saved intent, offline-ready episodes, and completed watch history in one place.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _SummaryStrip extends StatelessWidget {
   const _SummaryStrip({
     required this.watchlistCount,
-    required this.historyCount,
     required this.downloadsCount,
+    required this.historyCount,
   });
 
   final int? watchlistCount;
-  final int? historyCount;
   final int? downloadsCount;
+  final int? historyCount;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        _Badge(
+        _CountBadge(
           label: watchlistCount == null
-              ? 'Watchlist loading'
+              ? 'Watchlist…'
               : '${watchlistCount!} saved',
-          color: theme.colorScheme.primary,
+          color: colorScheme.primary,
         ),
-        _Badge(
+        _CountBadge(
           label: downloadsCount == null
-              ? 'Downloads loading'
+              ? 'Downloads…'
               : '${downloadsCount!} offline',
-          color: theme.colorScheme.secondary,
+          color: colorScheme.secondary,
         ),
-        _Badge(
-          label: historyCount == null
-              ? 'History loading'
-              : '${historyCount!} watched',
-          color: theme.colorScheme.tertiary,
+        _CountBadge(
+          label: historyCount == null ? 'History…' : '${historyCount!} watched',
+          color: colorScheme.tertiary,
         ),
       ],
     );
@@ -141,57 +104,47 @@ class _WatchlistSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return watchlist.when(
-      loading: () => const _SurfaceCard(
-        child: _LoadingRow(label: 'Loading saved titles...'),
+      loading: () => const _SectionLoading(
+        title: 'Watchlist',
+        message: 'Loading saved titles...',
       ),
-      error: (error, stackTrace) =>
-          _SurfaceCard(child: Text('Watchlist unavailable.\n$error')),
+      error: (error, stackTrace) => _SectionMessage(
+        title: 'Watchlist',
+        message: 'Saved titles could not be loaded.\n$error',
+      ),
       data: (entries) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Watchlist', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 6),
-          Text(
-            'Titles you saved to revisit later outside active playback.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          _SectionHeader(
+            title: 'Watchlist',
+            subtitle: 'Saved-for-later series outside active playback.',
+            trailing: entries.isEmpty
+                ? null
+                : TextButton(
+                    onPressed: () => context.push(AppRoutePaths.watchlist),
+                    child: const Text('Open all'),
+                  ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           if (entries.isEmpty)
-            const _SurfaceCard(
-              child: Text(
-                'No saved anime yet. Add titles from their series pages.',
-              ),
+            const _SectionMessage(
+              title: 'Nothing saved yet',
+              message:
+                  'Add titles from a series page to keep them here for later.',
             )
           else
-            _SurfaceCard(
+            _SurfaceBlock(
               child: Column(
                 children: [
                   for (
                     var index = 0;
-                    index < entries.take(3).length;
+                    index < entries.take(4).length;
                     index++
                   ) ...[
                     if (index > 0) const Divider(height: 20),
                     _WatchlistRow(entry: entries[index]),
                   ],
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      onPressed: () => context.push(AppRoutePaths.watchlist),
-                      icon: const Icon(Icons.bookmarks_outlined),
-                      label: Text(
-                        entries.length > 3
-                            ? 'Open full watchlist (${entries.length})'
-                            : 'Open watchlist',
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -208,65 +161,52 @@ class _DownloadsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return downloads.when(
-      loading: () => const _SurfaceCard(
-        child: _LoadingRow(label: 'Loading offline downloads...'),
+      loading: () => const _SectionLoading(
+        title: 'Downloads',
+        message: 'Loading offline library...',
       ),
-      error: (error, stackTrace) =>
-          _SurfaceCard(child: Text('Downloads unavailable.\n$error')),
-      data: (entries) {
-        final previewEntries = entries.take(3).toList(growable: false);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Downloads', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(
-              'Offline-ready episodes and active download states live here as a real product surface.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+      error: (error, stackTrace) => _SectionMessage(
+        title: 'Downloads',
+        message: 'Offline entries could not be loaded.\n$error',
+      ),
+      data: (entries) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            title: 'Downloads',
+            subtitle: 'Offline-ready and active download entries.',
+            trailing: entries.isEmpty
+                ? null
+                : TextButton(
+                    onPressed: () => context.push(AppRoutePaths.downloads),
+                    child: const Text('Open all'),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          if (entries.isEmpty)
+            const _SectionMessage(
+              title: 'No downloads yet',
+              message:
+                  'Download episodes from a series page to build an offline library.',
+            )
+          else
+            _SurfaceBlock(
+              child: Column(
+                children: [
+                  for (
+                    var index = 0;
+                    index < entries.take(4).length;
+                    index++
+                  ) ...[
+                    if (index > 0) const Divider(height: 20),
+                    _DownloadPreviewRow(entry: entries[index]),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            if (entries.isEmpty)
-              const _SurfaceCard(
-                child: Text(
-                  'No offline downloads yet. Download episodes from a series page.',
-                ),
-              )
-            else
-              _SurfaceCard(
-                child: Column(
-                  children: [
-                    for (
-                      var index = 0;
-                      index < previewEntries.length;
-                      index++
-                    ) ...[
-                      if (index > 0) const Divider(height: 20),
-                      _DownloadPreviewRow(entry: previewEntries[index]),
-                    ],
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.tonalIcon(
-                        onPressed: () => context.push(AppRoutePaths.downloads),
-                        icon: const Icon(Icons.download_rounded),
-                        label: Text(
-                          entries.length > 3
-                              ? 'Open full downloads (${entries.length})'
-                              : 'Open downloads',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -278,57 +218,47 @@ class _HistorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return history.when(
-      loading: () => const _SurfaceCard(
-        child: _LoadingRow(label: 'Loading watch history...'),
+      loading: () => const _SectionLoading(
+        title: 'History',
+        message: 'Loading completed episodes...',
       ),
-      error: (error, stackTrace) =>
-          _SurfaceCard(child: Text('History unavailable.\n$error')),
+      error: (error, stackTrace) => _SectionMessage(
+        title: 'History',
+        message: 'Watch history could not be loaded.\n$error',
+      ),
       data: (entries) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Watch History', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 6),
-          Text(
-            'Completed episode activity kept separate from active re-entry.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          _SectionHeader(
+            title: 'History',
+            subtitle: 'Completed episode activity separate from re-entry.',
+            trailing: entries.isEmpty
+                ? null
+                : TextButton(
+                    onPressed: () => context.push(AppRoutePaths.history),
+                    child: const Text('Open all'),
+                  ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           if (entries.isEmpty)
-            const _SurfaceCard(
-              child: Text(
-                'No completed episodes yet. Finished anime will appear here.',
-              ),
+            const _SectionMessage(
+              title: 'Nothing completed yet',
+              message:
+                  'Finished episodes will appear here after watch completion.',
             )
           else
-            _SurfaceCard(
+            _SurfaceBlock(
               child: Column(
                 children: [
                   for (
                     var index = 0;
-                    index < entries.take(3).length;
+                    index < entries.take(4).length;
                     index++
                   ) ...[
                     if (index > 0) const Divider(height: 20),
                     _HistoryRow(entry: entries[index]),
                   ],
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      onPressed: () => context.push(AppRoutePaths.history),
-                      icon: const Icon(Icons.history_rounded),
-                      label: Text(
-                        entries.length > 3
-                            ? 'Open full history (${entries.length})'
-                            : 'Open history',
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -350,7 +280,7 @@ class _WatchlistRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,18 +294,21 @@ class _WatchlistRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Badge(label: 'Saved', color: theme.colorScheme.primary),
-                  const SizedBox(height: 10),
                   Text(entry.series.title, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(
-                    'Open series',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
+                    'Saved for later',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -399,7 +332,7 @@ class _HistoryRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,25 +346,23 @@ class _HistoryRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Badge(label: 'Completed', color: theme.colorScheme.tertiary),
-                  const SizedBox(height: 10),
                   Text(entry.series.title, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(
-                    episodeTitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    '$episodeTitle • Episode ${entry.episode.numberLabel}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Episode ${entry.episode.numberLabel}',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
                     ),
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -461,7 +392,7 @@ class _DownloadPreviewRow extends ConsumerWidget {
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             onTap: () => context.push(AppRoutePaths.downloads),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,24 +403,28 @@ class _DownloadPreviewRow extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Badge(
-                        label: _downloadStatusLabel(entry),
-                        color: _downloadStatusColor(context, entry.status),
-                      ),
-                      const SizedBox(height: 10),
                       Text(
                         series.title,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '$episodeLabel • ${entry.selectedQuality}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        '$episodeLabel • ${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  entry.isPlayableOffline
+                      ? Icons.offline_pin_rounded
+                      : Icons.chevron_right_rounded,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -516,19 +451,16 @@ class _DownloadPreviewFallback extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Badge(
-                label: _downloadStatusLabel(entry),
-                color: _downloadStatusColor(context, entry.status),
-              ),
-              const SizedBox(height: 10),
               Text(
                 entry.seriesId,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
               Text(
-                'Episode ${entry.episodeId} • ${entry.selectedQuality}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                'Episode ${entry.episodeId} • ${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -549,6 +481,120 @@ Episode? _findEpisode(List<Episode> episodes, String episodeId) {
   return null;
 }
 
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+      ],
+    );
+  }
+}
+
+class _SectionLoading extends StatelessWidget {
+  const _SectionLoading({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title: title, subtitle: message),
+        const SizedBox(height: 12),
+        const SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionMessage extends StatelessWidget {
+  const _SectionMessage({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SurfaceBlock extends StatelessWidget {
+  const _SurfaceBlock({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+}
+
 class _Poster extends StatelessWidget {
   const _Poster({required this.imageUrl, required this.label});
 
@@ -561,9 +607,9 @@ class _Poster extends StatelessWidget {
     final trimmedUrl = imageUrl?.trim();
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        width: 84,
+        width: 72,
         child: AspectRatio(
           aspectRatio: 2 / 3,
           child: trimmedUrl == null || trimmedUrl.isEmpty
@@ -587,9 +633,8 @@ class _Poster extends StatelessWidget {
                         ],
                       );
                     },
-                    errorBuilder: (context, error, stackTrace) {
-                      return _PosterFallback(label: label);
-                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        _PosterFallback(label: label),
                   ),
                 ),
         ),
@@ -641,47 +686,8 @@ class _PosterFallback extends StatelessWidget {
   }
 }
 
-class _SurfaceCard extends StatelessWidget {
-  const _SurfaceCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Padding(padding: const EdgeInsets.all(16), child: child),
-    );
-  }
-}
-
-class _LoadingRow extends StatelessWidget {
-  const _LoadingRow({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Text(label)),
-      ],
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label, required this.color});
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -712,16 +718,5 @@ String _downloadStatusLabel(DownloadEntry entry) {
     DownloadStatus.queued => 'Queued',
     DownloadStatus.paused => 'Paused',
     DownloadStatus.failed => 'Failed',
-  };
-}
-
-Color _downloadStatusColor(BuildContext context, DownloadStatus status) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return switch (status) {
-    DownloadStatus.completed => colorScheme.primary,
-    DownloadStatus.downloading ||
-    DownloadStatus.queued => colorScheme.secondary,
-    DownloadStatus.paused => colorScheme.tertiary,
-    DownloadStatus.failed => colorScheme.error,
   };
 }
