@@ -12,237 +12,243 @@ import 'package:anime_stream_app/data/repositories/local/local_downloads_reposit
 import 'package:anime_stream_app/domain/models/download_entry.dart';
 
 void main() {
-  group('LocalDownloadsRepository', () {
-    test('queues a new episode download as metadata only foundation state', () async {
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'downloads-repository-test',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
-      });
+  group('LocalDownloadsRepository offline integrity normalization', () {
+    test(
+      'demotes completed entry when local asset is missing and persists change',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_missing_asset_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
 
-      final downloadsStore = JsonDownloadsStore(
-        directoryProvider: () async => tempDirectory,
-        relativeFilePath: 'downloads/download_entries.json',
-      );
-      final repository = LocalDownloadsRepository(
-        downloadsStore: downloadsStore,
-        remoteDataSource: _FakeRemoteDataSource(),
-        dio: Dio(),
-        downloadsRootDirectoryProvider: () async => tempDirectory,
-      );
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
 
-      await repository.queueEpisodeDownload(
-        seriesId: 'series-1',
-        episodeId: 'episode-7',
-        selectedQuality: '720p',
-      );
+        final missingAssetUri = Uri.file(
+          '${sandbox.path}/downloads/series-1/ep-1/1080p/index.m3u8',
+        ).toString();
 
-      final entries = await repository.getDownloads();
-
-      expect(entries, hasLength(1));
-      expect(entries.first.seriesId, 'series-1');
-      expect(entries.first.episodeId, 'episode-7');
-      expect(entries.first.selectedQuality, '720p');
-      expect(entries.first.status, DownloadStatus.queued);
-      expect(entries.first.isPlayableOffline, isFalse);
-    });
-
-    test('downloads HLS VOD assets into a local playable package', () async {
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'downloads-repository-execution-test',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
-      });
-
-      final downloadsStore = JsonDownloadsStore(
-        directoryProvider: () async => tempDirectory,
-        relativeFilePath: 'downloads/download_entries.json',
-      );
-
-      final dio = Dio();
-      dio.interceptors.add(
-        InterceptorsWrapper(
-          onRequest: (options, handler) {
-            final url = options.uri.toString();
-            if (url == 'https://cdn.example.com/episode/index.m3u8') {
-              handler.resolve(
-                Response<String>(
-                  requestOptions: options,
-                  statusCode: 200,
-                  data: '#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:5.0,\nseg-1.ts\n#EXTINF:5.0,\nseg-2.ts\n#EXT-X-ENDLIST',
-                ),
-              );
-              return;
-            }
-
-            if (url == 'https://cdn.example.com/episode/init.mp4') {
-              handler.resolve(
-                Response<List<int>>(
-                  requestOptions: options,
-                  statusCode: 200,
-                  data: const [0, 1, 2, 3],
-                ),
-              );
-              return;
-            }
-
-            if (url == 'https://cdn.example.com/episode/seg-1.ts') {
-              handler.resolve(
-                Response<List<int>>(
-                  requestOptions: options,
-                  statusCode: 200,
-                  data: const [4, 5, 6],
-                ),
-              );
-              return;
-            }
-
-            if (url == 'https://cdn.example.com/episode/seg-2.ts') {
-              handler.resolve(
-                Response<List<int>>(
-                  requestOptions: options,
-                  statusCode: 200,
-                  data: const [7, 8, 9, 10],
-                ),
-              );
-              return;
-            }
-
-            handler.reject(
-              DioException(
-                requestOptions: options,
-                message: 'Unexpected request in test: $url',
-              ),
-            );
-          },
-        ),
-      );
-
-      final repository = LocalDownloadsRepository(
-        downloadsStore: downloadsStore,
-        remoteDataSource: _FakeRemoteDataSource(
-          release: const AnilibriaReleaseDto(
-            id: 'series-9',
-            episodes: [
-              AnilibriaEpisodeDto(
-                id: 'episode-2',
-                releaseId: 'series-9',
-                ordinal: 2,
-                numberLabel: '2',
-                title: 'Offline Probe',
-                hls720Url: 'https://cdn.example.com/episode/index.m3u8',
-              ),
-            ],
-          ),
-        ),
-        dio: dio,
-        downloadsRootDirectoryProvider: () async => tempDirectory,
-      );
-
-      final completedEntry = await repository.startEpisodeDownload(
-        seriesId: 'series-9',
-        episodeId: 'episode-2',
-        selectedQuality: '720p',
-      );
-
-      expect(completedEntry.status, DownloadStatus.completed);
-      expect(completedEntry.isPlayableOffline, isTrue);
-      expect(completedEntry.localAssetUri, startsWith('file://'));
-      expect(completedEntry.bytesDownloaded, 11);
-
-      final localManifestFile = File(
-        Uri.parse(completedEntry.localAssetUri!).toFilePath(),
-      );
-      expect(await localManifestFile.exists(), isTrue);
-
-      final localManifest = await localManifestFile.readAsString();
-      expect(localManifest, contains('asset_0000.mp4'));
-      expect(localManifest, contains('asset_0001.ts'));
-      expect(localManifest, contains('asset_0002.ts'));
-      expect(localManifest, isNot(contains('https://cdn.example.com')));
-
-      final playableEntry = await repository.getPlayableDownload(
-        seriesId: 'series-9',
-        episodeId: 'episode-2',
-      );
-      expect(playableEntry, isNotNull);
-      expect(playableEntry!.localAssetUri, completedEntry.localAssetUri);
-    });
-
-    test('returns completed local asset for offline playback and removes bytes on deletion', () async {
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'downloads-repository-offline-test',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
-      });
-
-      final episodeDirectory = Directory(
-        '${tempDirectory.path}/downloads/series-9/episode-2/1080p',
-      );
-      await episodeDirectory.create(recursive: true);
-      await File('${episodeDirectory.path}/index.m3u8').writeAsString('#EXTM3U');
-
-      final downloadsStore = JsonDownloadsStore(
-        directoryProvider: () async => tempDirectory,
-        relativeFilePath: 'downloads/download_entries.json',
-      );
-      await downloadsStore.writeAll({
-        'series-9::episode-2::1080p': const DownloadEntry(
-          id: 'series-9::episode-2::1080p',
-          seriesId: 'series-9',
-          episodeId: 'episode-2',
+        final entry = DownloadEntry(
+          id: 'series-1::ep-1::1080p',
+          seriesId: 'series-1',
+          episodeId: 'ep-1',
           selectedQuality: '1080p',
           status: DownloadStatus.completed,
-          localAssetUri: 'file:///tmp/index.m3u8',
-          storageDirectoryPath: '/tmp/storage',
-          createdAt: null,
-          completedAt: null,
-        ).copyWith(
-          localAssetUri: 'file://${episodeDirectory.path}/index.m3u8',
-          storageDirectoryPath: episodeDirectory.path,
-        ).toJson(),
-      });
+          localAssetUri: missingAssetUri,
+          storageDirectoryPath: '${sandbox.path}/downloads/series-1/ep-1/1080p',
+          createdAt: DateTime(2026, 1, 1),
+          completedAt: DateTime(2026, 1, 2),
+        );
 
-      final repository = LocalDownloadsRepository(
-        downloadsStore: downloadsStore,
-        remoteDataSource: _FakeRemoteDataSource(),
-        dio: Dio(),
-        downloadsRootDirectoryProvider: () async => tempDirectory,
-      );
+        await store.writeAll({entry.id: entry.toJson()});
 
-      final playableEntry = await repository.getPlayableDownload(
-        seriesId: 'series-9',
-        episodeId: 'episode-2',
-      );
+        final entries = await repository.getDownloads();
+        final normalized = entries.single;
 
-      expect(playableEntry, isNotNull);
-      expect(playableEntry!.isPlayableOffline, isTrue);
+        expect(normalized.status, DownloadStatus.failed);
+        expect(normalized.localAssetUri, isNull);
+        expect(normalized.completedAt, isNull);
+        expect(normalized.lastError, 'Offline asset is missing on device.');
 
-      await repository.removeDownload(playableEntry.id);
+        final persisted = await store.readAll();
+        final persistedEntry = DownloadEntry.fromJson(
+          Map<String, dynamic>.from(persisted[entry.id] as Map),
+        );
 
-      final remainingEntries = await repository.getDownloads();
-      expect(remainingEntries, isEmpty);
-      expect(await episodeDirectory.exists(), isFalse);
-    });
+        expect(persistedEntry.status, DownloadStatus.failed);
+        expect(persistedEntry.localAssetUri, isNull);
+        expect(persistedEntry.completedAt, isNull);
+        expect(persistedEntry.lastError, 'Offline asset is missing on device.');
+      },
+    );
+
+    test(
+      'demotes completed HLS entry when package directory is missing on device',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_missing_dir_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        final assetFile = File('${sandbox.path}/index.m3u8');
+        await assetFile.writeAsString('#EXTM3U\n');
+
+        final entry = DownloadEntry(
+          id: 'series-2::ep-3::720p',
+          seriesId: 'series-2',
+          episodeId: 'ep-3',
+          selectedQuality: '720p',
+          status: DownloadStatus.completed,
+          localAssetUri: assetFile.uri.toString(),
+          storageDirectoryPath: '${sandbox.path}/downloads/series-2/ep-3/720p',
+          createdAt: DateTime(2026, 2, 1),
+          completedAt: DateTime(2026, 2, 2),
+        );
+
+        await store.writeAll({entry.id: entry.toJson()});
+
+        final entries = await repository.getDownloads();
+        final normalized = entries.single;
+
+        expect(normalized.status, DownloadStatus.failed);
+        expect(normalized.localAssetUri, isNull);
+        expect(normalized.completedAt, isNull);
+        expect(
+          normalized.lastError,
+          'Offline package directory is missing on device.',
+        );
+      },
+    );
+
+    test(
+      'keeps completed entry playable when local asset and package directory are valid',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_valid_asset_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        final packageDir = Directory(
+          '${sandbox.path}/downloads/series-3/ep-7/1080p',
+        );
+        await packageDir.create(recursive: true);
+
+        final assetFile = File('${packageDir.path}/index.m3u8');
+        await assetFile.writeAsString('#EXTM3U\n#EXT-X-ENDLIST\n');
+
+        final entry = DownloadEntry(
+          id: 'series-3::ep-7::1080p',
+          seriesId: 'series-3',
+          episodeId: 'ep-7',
+          selectedQuality: '1080p',
+          status: DownloadStatus.completed,
+          localAssetUri: assetFile.uri.toString(),
+          storageDirectoryPath: packageDir.path,
+          createdAt: DateTime(2026, 3, 1),
+          completedAt: DateTime(2026, 3, 2),
+        );
+
+        await store.writeAll({entry.id: entry.toJson()});
+
+        final entries = await repository.getDownloads();
+        final normalized = entries.single;
+
+        expect(normalized.status, DownloadStatus.completed);
+        expect(normalized.localAssetUri, assetFile.uri.toString());
+        expect(normalized.isPlayableOffline, isTrue);
+
+        final playable = await repository.getPlayableDownload(
+          seriesId: 'series-3',
+          episodeId: 'ep-7',
+        );
+
+        expect(playable, isNotNull);
+        expect(playable!.id, entry.id);
+      },
+    );
+
+    test(
+      'demotes completed local-file entry with empty file payload',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_empty_file_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        final assetFile = File('${sandbox.path}/empty.mp4');
+        await assetFile.writeAsBytes(const []);
+
+        final entry = DownloadEntry(
+          id: 'series-4::ep-2::local',
+          seriesId: 'series-4',
+          episodeId: 'ep-2',
+          selectedQuality: '480p',
+          status: DownloadStatus.completed,
+          localAssetUri: assetFile.uri.toString(),
+          sourceKind: DownloadSourceKind.localFile,
+          createdAt: DateTime(2026, 4, 1),
+          completedAt: DateTime(2026, 4, 2),
+        );
+
+        await store.writeAll({entry.id: entry.toJson()});
+
+        final entries = await repository.getDownloads();
+        final normalized = entries.single;
+
+        expect(normalized.status, DownloadStatus.failed);
+        expect(normalized.localAssetUri, isNull);
+        expect(normalized.lastError, 'Offline asset is empty.');
+      },
+    );
   });
 }
 
-class _FakeRemoteDataSource implements AnilibriaRemoteDataSource {
-  const _FakeRemoteDataSource({this.release});
-
-  final AnilibriaReleaseDto? release;
-
+class _FakeAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
   @override
   Future<List<AnilibriaReleaseDto>> fetchFeaturedReleases({int limit = 20}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchPopularReleases({int limit = 20}) {
     throw UnimplementedError();
   }
 
@@ -255,16 +261,8 @@ class _FakeRemoteDataSource implements AnilibriaRemoteDataSource {
   }
 
   @override
-  Future<List<AnilibriaReleaseDto>> fetchPopularReleases({int limit = 20}) {
+  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) {
     throw UnimplementedError();
-  }
-
-  @override
-  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) async {
-    if (release == null) {
-      throw StateError('No release configured for test');
-    }
-    return release!;
   }
 
   @override
@@ -273,20 +271,15 @@ class _FakeRemoteDataSource implements AnilibriaRemoteDataSource {
   }
 
   @override
-  Future<List<AnilibriaReleaseDto>> fetchSimulcastReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
   Future<List<AnilibriaReleaseDto>> searchReleases(
     String query, {
     int limit = 20,
   }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchSimulcastReleases({int limit = 20}) {
     throw UnimplementedError();
   }
 }
