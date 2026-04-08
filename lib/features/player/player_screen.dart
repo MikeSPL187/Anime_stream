@@ -1110,6 +1110,8 @@ class _PlaybackStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHandset = MediaQuery.sizeOf(context).shortestSide < 600;
+    final isHandsetFullscreen = isHandset && isFullscreen;
     final effectiveControlsVisible =
         controlsVisible || !isPlaying || isBuffering || isCompleted;
     final theme = Theme.of(context);
@@ -1121,6 +1123,21 @@ class _PlaybackStage extends StatelessWidget {
         ? 'Playing'
         : 'Paused';
     final stageLabel = '$qualityLabel • ${sessionContext.episodeDisplayLabel}';
+    final titleStyle = isHandsetFullscreen
+        ? theme.textTheme.titleSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          )
+        : theme.textTheme.titleMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          );
+    final dockBackground = isHandsetFullscreen
+        ? const Color(0x2E101010)
+        : const Color(0x40101010);
+    final dockPadding = isHandsetFullscreen
+        ? const EdgeInsets.fromLTRB(12, 8, 12, 10)
+        : const EdgeInsets.fromLTRB(14, 10, 14, 12);
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -1159,7 +1176,9 @@ class _PlaybackStage extends StatelessWidget {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                    padding: isHandsetFullscreen
+                        ? const EdgeInsets.fromLTRB(12, 8, 12, 12)
+                        : const EdgeInsets.fromLTRB(14, 12, 14, 14),
                     child: Column(
                       children: [
                         Row(
@@ -1183,16 +1202,12 @@ class _PlaybackStage extends StatelessWidget {
                                     sessionContext.seriesTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                        ),
+                                    style: titleStyle,
                                   ),
-                                  const SizedBox(height: 3),
+                                  SizedBox(height: isHandsetFullscreen ? 2 : 3),
                                   Text(
                                     sessionContext.episodeTitle,
-                                    maxLines: 2,
+                                    maxLines: isHandsetFullscreen ? 1 : 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: Colors.white70,
@@ -1211,54 +1226,62 @@ class _PlaybackStage extends StatelessWidget {
                         ),
                         const Spacer(),
                         ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 760),
+                          constraints: BoxConstraints(
+                            maxWidth: isHandsetFullscreen ? 420 : 760,
+                          ),
                           child: _PlayerGlassPanel(
-                            backgroundColor: const Color(0x40101010),
-                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                            backgroundColor: dockBackground,
+                            padding: dockPadding,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        stageLabel,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(color: Colors.white70),
-                                      ),
-                                    ),
-                                    if (canToggleFullscreen) ...[
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        onPressed: () {
-                                          unawaited(onToggleFullscreen());
-                                        },
-                                        icon: Icon(
-                                          isFullscreen
-                                              ? Icons.fullscreen_exit_rounded
-                                              : Icons.fullscreen_rounded,
-                                          color: Colors.white,
+                                if (!isHandsetFullscreen) ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          stageLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(color: Colors.white70),
                                         ),
-                                        tooltip: isFullscreen
-                                            ? 'Exit Fullscreen'
-                                            : 'Enter Fullscreen',
                                       ),
+                                      if (canToggleFullscreen) ...[
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          onPressed: () {
+                                            unawaited(onToggleFullscreen());
+                                          },
+                                          icon: Icon(
+                                            isFullscreen
+                                                ? Icons.fullscreen_exit_rounded
+                                                : Icons.fullscreen_rounded,
+                                            color: Colors.white,
+                                          ),
+                                          tooltip: isFullscreen
+                                              ? 'Exit Fullscreen'
+                                              : 'Enter Fullscreen',
+                                        ),
+                                      ],
                                     ],
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     _OverlayTransportButton(
                                       icon: Icons.replay_10_rounded,
+                                      compact: isHandsetFullscreen,
                                       onPressed: () async {
                                         await onSeekBackward();
                                       },
                                     ),
-                                    const SizedBox(width: 18),
+                                    SizedBox(
+                                      width: isHandsetFullscreen ? 14 : 18,
+                                    ),
                                     _OverlayTransportButton(
                                       icon: isCompleted
                                           ? Icons.replay_rounded
@@ -1266,28 +1289,67 @@ class _PlaybackStage extends StatelessWidget {
                                           ? Icons.pause_rounded
                                           : Icons.play_arrow_rounded,
                                       isPrimary: true,
+                                      compact: isHandsetFullscreen,
                                       onPressed: () async {
                                         await onPrimaryAction();
                                       },
                                     ),
-                                    const SizedBox(width: 18),
+                                    SizedBox(
+                                      width: isHandsetFullscreen ? 14 : 18,
+                                    ),
                                     _OverlayTransportButton(
                                       icon: Icons.forward_10_rounded,
+                                      compact: isHandsetFullscreen,
                                       onPressed: () async {
                                         await onSeekForward();
                                       },
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
+                                SizedBox(height: isHandsetFullscreen ? 6 : 10),
                                 _PlaybackTimeline(
                                   player: player,
                                   textColor: Colors.white,
-                                  inactiveColor: Colors.white24,
+                                  inactiveColor: isHandsetFullscreen
+                                      ? Colors.white10
+                                      : Colors.white24,
+                                  compact: isHandsetFullscreen,
                                   onInteractionStart:
                                       onTimelineInteractionStart,
                                   onInteractionEnd: onTimelineInteractionEnd,
                                 ),
+                                if (isHandsetFullscreen) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          stageLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                                color: Colors.white54,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                      if (canToggleFullscreen)
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () {
+                                            unawaited(onToggleFullscreen());
+                                          },
+                                          icon: const Icon(
+                                            Icons.fullscreen_exit_rounded,
+                                            color: Colors.white70,
+                                            size: 20,
+                                          ),
+                                          tooltip: 'Exit Fullscreen',
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -1555,12 +1617,14 @@ class _PlaybackTimeline extends StatefulWidget {
     required this.textColor,
     required this.onInteractionStart,
     required this.onInteractionEnd,
+    this.compact = false,
     this.inactiveColor,
   });
 
   final Player player;
   final Color textColor;
   final Color? inactiveColor;
+  final bool compact;
   final VoidCallback onInteractionStart;
   final VoidCallback onInteractionEnd;
 
@@ -1604,11 +1668,15 @@ class _PlaybackTimelineState extends State<_PlaybackTimeline> {
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     overlayShape: SliderComponentShape.noOverlay,
+                    trackHeight: widget.compact ? 2 : null,
                     activeTrackColor: widget.textColor,
                     inactiveTrackColor:
                         widget.inactiveColor ??
                         widget.textColor.withValues(alpha: 0.24),
                     thumbColor: widget.textColor,
+                    thumbShape: RoundSliderThumbShape(
+                      enabledThumbRadius: widget.compact ? 5 : 6,
+                    ),
                   ),
                   child: Slider(
                     value: displayedValue,
@@ -1850,14 +1918,29 @@ class _OverlayTransportButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.isPrimary = false,
+    this.compact = false,
   });
 
   final IconData icon;
   final Future<void> Function() onPressed;
   final bool isPrimary;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final dimension = switch ((isPrimary, compact)) {
+      (true, true) => 58.0,
+      (true, false) => 64.0,
+      (false, true) => 46.0,
+      (false, false) => 52.0,
+    };
+    final iconSize = switch ((isPrimary, compact)) {
+      (true, true) => 28.0,
+      (true, false) => 30.0,
+      (false, true) => 20.0,
+      (false, false) => 22.0,
+    };
+
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: isPrimary
@@ -1885,16 +1968,17 @@ class _OverlayTransportButton extends StatelessWidget {
             : null,
       ),
       child: SizedBox(
-        width: isPrimary ? 64 : 52,
-        height: isPrimary ? 64 : 52,
+        width: dimension,
+        height: dimension,
         child: IconButton(
+          padding: EdgeInsets.zero,
           onPressed: () {
             unawaited(onPressed());
           },
           icon: Icon(
             icon,
             color: isPrimary ? Colors.black : Colors.white,
-            size: isPrimary ? 30 : 22,
+            size: iconSize,
           ),
         ),
       ),
