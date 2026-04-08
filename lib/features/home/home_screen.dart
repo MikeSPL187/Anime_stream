@@ -62,6 +62,10 @@ class _HomeLaunchSurface extends StatelessWidget {
     final isInitialLoading =
         !hasInitialContent &&
         (featuredSeries.isLoading || browseCatalog.isLoading);
+    final hideContinueWatching =
+        continueWatching.asData?.value.isEmpty == true &&
+        !continueWatching.isLoading &&
+        !continueWatching.hasError;
 
     if (isInitialLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -72,8 +76,10 @@ class _HomeLaunchSurface extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
-          _ContinueWatchingSection(continueWatching: continueWatching),
-          const SizedBox(height: 24),
+          if (!hideContinueWatching) ...[
+            _ContinueWatchingSection(continueWatching: continueWatching),
+            const SizedBox(height: 24),
+          ],
           if (featuredData.isNotEmpty)
             _FeaturedHero(series: featuredData.first)
           else
@@ -108,11 +114,7 @@ class _ContinueWatchingSection extends StatelessWidget {
       ),
       data: (entries) {
         if (entries.isEmpty) {
-          return const _InlineEmptyState(
-            title: 'Nothing to resume',
-            message:
-                'Start an episode from a series page and Home will bring it back here.',
-          );
+          return const SizedBox.shrink();
         }
 
         return Column(

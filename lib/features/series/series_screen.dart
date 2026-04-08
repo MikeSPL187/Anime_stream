@@ -59,9 +59,9 @@ class _SeriesPage extends StatelessWidget {
         const SizedBox(height: 16),
         _PrimaryWatchPanel(details: details),
         const SizedBox(height: 22),
-        _EpisodesSection(details: details),
-        const SizedBox(height: 22),
         _SaveIntentSection(series: series),
+        const SizedBox(height: 22),
+        _EpisodesSection(details: details),
         const SizedBox(height: 22),
         _SeriesDetailsSection(
           series: series,
