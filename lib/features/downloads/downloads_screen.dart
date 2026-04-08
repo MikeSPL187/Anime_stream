@@ -33,7 +33,11 @@ class DownloadsScreen extends ConsumerWidget {
         ],
       ),
       body: downloads.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const _DownloadsState(
+          icon: Icons.download_rounded,
+          title: 'Loading downloads',
+          message: 'Offline library is being prepared.',
+        ),
         error: (error, stackTrace) => _DownloadsState(
           icon: Icons.error_outline_rounded,
           title: 'Downloads unavailable',
@@ -71,7 +75,7 @@ class DownloadsScreen extends ConsumerWidget {
           final integrityFailures = failed.where(_isIntegrityFailure).length;
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             children: [
               _SummaryStrip(
                 totalCount: entries.length,
@@ -80,14 +84,14 @@ class DownloadsScreen extends ConsumerWidget {
                 failedCount: failed.length,
                 integrityFailureCount: integrityFailures,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
               if (offlineReady.isNotEmpty) ...[
                 _DownloadsSection(
                   title: 'Available offline',
                   subtitle: 'Ready to open directly in the player.',
                   entries: offlineReady,
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 26),
               ],
               if (active.isNotEmpty) ...[
                 _DownloadsSection(
@@ -95,7 +99,7 @@ class DownloadsScreen extends ConsumerWidget {
                   subtitle: 'Queued, downloading, and paused transfers.',
                   entries: active,
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 26),
               ],
               if (failed.isNotEmpty)
                 _DownloadsSection(
@@ -176,23 +180,21 @@ class _DownloadsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _SurfaceBlock(
-          child: Column(
-            children: [
-              for (var index = 0; index < entries.length; index++) ...[
-                if (index > 0) const Divider(height: 20),
-                _DownloadRow(entry: entries[index]),
-              ],
+        Column(
+          children: [
+            for (var index = 0; index < entries.length; index++) ...[
+              if (index > 0) const SizedBox(height: 14),
+              _DownloadCard(entry: entries[index]),
             ],
-          ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _DownloadRow extends ConsumerWidget {
-  const _DownloadRow({required this.entry});
+class _DownloadCard extends ConsumerWidget {
+  const _DownloadCard({required this.entry});
 
   final DownloadEntry entry;
 
@@ -209,10 +211,50 @@ class _DownloadRow extends ConsumerWidget {
     );
 
     return detailsAsync.when(
-      loading: () =>
-          _DownloadRowFallback(entry: entry, isBusy: actionState.isLoading),
-      error: (error, stackTrace) =>
-          _DownloadRowFallback(entry: entry, isBusy: actionState.isLoading),
+      loading: () => _DownloadCardScaffold(
+        entry: entry,
+        isBusy: actionState.isLoading,
+        seriesTitle: entry.seriesId,
+        posterUrl: null,
+        episodeLabel: 'Episode ${entry.episodeId}',
+        episodeTitle: entry.selectedQuality,
+        onOpenSeries: () =>
+            context.push(AppRoutePaths.seriesDetails(entry.seriesId)),
+        onPlayOffline: entry.isPlayableOffline
+            ? () => context.push(
+                AppRoutePaths.player,
+                extra: PlayerScreenContext(
+                  seriesId: entry.seriesId,
+                  seriesTitle: entry.seriesId,
+                  episodeId: entry.episodeId,
+                  episodeNumberLabel: entry.episodeId,
+                  episodeTitle: 'Episode ${entry.episodeId}',
+                ),
+              )
+            : null,
+      ),
+      error: (error, stackTrace) => _DownloadCardScaffold(
+        entry: entry,
+        isBusy: actionState.isLoading,
+        seriesTitle: entry.seriesId,
+        posterUrl: null,
+        episodeLabel: 'Episode ${entry.episodeId}',
+        episodeTitle: entry.selectedQuality,
+        onOpenSeries: () =>
+            context.push(AppRoutePaths.seriesDetails(entry.seriesId)),
+        onPlayOffline: entry.isPlayableOffline
+            ? () => context.push(
+                AppRoutePaths.player,
+                extra: PlayerScreenContext(
+                  seriesId: entry.seriesId,
+                  seriesTitle: entry.seriesId,
+                  episodeId: entry.episodeId,
+                  episodeNumberLabel: entry.episodeId,
+                  episodeTitle: 'Episode ${entry.episodeId}',
+                ),
+              )
+            : null,
+      ),
       data: (details) {
         final episode = _episodeForEntry(details.episodes, entry.episodeId);
         final episodeLabel = episode == null
@@ -229,7 +271,7 @@ class _DownloadRow extends ConsumerWidget {
           episodeTitle: episodeTitle,
         );
 
-        return _DownloadRowScaffold(
+        return _DownloadCardScaffold(
           entry: entry,
           isBusy: actionState.isLoading,
           seriesTitle: details.series.title,
@@ -266,41 +308,8 @@ class EpisodeSummary {
   final String title;
 }
 
-class _DownloadRowFallback extends StatelessWidget {
-  const _DownloadRowFallback({required this.entry, required this.isBusy});
-
-  final DownloadEntry entry;
-  final bool isBusy;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DownloadRowScaffold(
-      entry: entry,
-      isBusy: isBusy,
-      seriesTitle: entry.seriesId,
-      posterUrl: null,
-      episodeLabel: 'Episode ${entry.episodeId}',
-      episodeTitle: entry.selectedQuality,
-      onOpenSeries: () =>
-          context.push(AppRoutePaths.seriesDetails(entry.seriesId)),
-      onPlayOffline: entry.isPlayableOffline
-          ? () => context.push(
-              AppRoutePaths.player,
-              extra: PlayerScreenContext(
-                seriesId: entry.seriesId,
-                seriesTitle: entry.seriesId,
-                episodeId: entry.episodeId,
-                episodeNumberLabel: entry.episodeId,
-                episodeTitle: 'Episode ${entry.episodeId}',
-              ),
-            )
-          : null,
-    );
-  }
-}
-
-class _DownloadRowScaffold extends ConsumerWidget {
-  const _DownloadRowScaffold({
+class _DownloadCardScaffold extends ConsumerWidget {
+  const _DownloadCardScaffold({
     required this.entry,
     required this.isBusy,
     required this.seriesTitle,
@@ -341,82 +350,186 @@ class _DownloadRowScaffold extends ConsumerWidget {
     }
 
     final integrityFailure = _isIntegrityFailure(entry);
+    final pillLabel = switch (entry.status) {
+      DownloadStatus.completed when entry.isPlayableOffline => 'Offline ready',
+      DownloadStatus.completed => 'Downloaded',
+      DownloadStatus.downloading => 'Downloading',
+      DownloadStatus.queued => 'Queued',
+      DownloadStatus.paused => 'Paused',
+      DownloadStatus.failed when integrityFailure => 'Restore needed',
+      DownloadStatus.failed => 'Failed',
+    };
+    final pillIcon = switch (entry.status) {
+      DownloadStatus.completed when entry.isPlayableOffline =>
+        Icons.offline_pin_rounded,
+      DownloadStatus.completed => Icons.check_circle_outline_rounded,
+      DownloadStatus.downloading => Icons.download_rounded,
+      DownloadStatus.queued => Icons.schedule_rounded,
+      DownloadStatus.paused => Icons.pause_circle_outline_rounded,
+      DownloadStatus.failed when integrityFailure =>
+        Icons.warning_amber_rounded,
+      DownloadStatus.failed => Icons.error_outline_rounded,
+    };
+
     final primaryRecoveryLabel = integrityFailure ? 'Download again' : 'Retry';
     final primaryRecoveryIcon = integrityFailure
         ? Icons.download_rounded
         : Icons.refresh_rounded;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _Poster(imageUrl: posterUrl, label: seriesTitle),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(seriesTitle, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(
-                '$episodeLabel • ${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPlayOffline ?? onOpenSeries,
+        borderRadius: BorderRadius.circular(20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            height: 244,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimeCachedArtwork(
+                  imageUrl: posterUrl,
+                  label: seriesTitle,
+                  icon: Icons.movie_creation_outlined,
+                  alignment: Alignment.topCenter,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                episodeTitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.04),
+                          Colors.black.withValues(alpha: 0.14),
+                          Colors.black.withValues(alpha: 0.92),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              if ((entry.lastError ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  _friendlyDownloadError(entry),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  child: _OverlayPill(label: pillLabel, icon: pillIcon),
+                ),
+                if (isBusy)
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.46),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        seriesTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          height: 1.05,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        episodeLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.84),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        episodeTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.92),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.78),
+                        ),
+                      ),
+                      if ((entry.lastError ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _friendlyDownloadError(entry),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          if (onPlayOffline != null)
+                            FilledButton.tonalIcon(
+                              onPressed: isBusy ? null : onPlayOffline,
+                              icon: const Icon(Icons.offline_pin_rounded),
+                              label: const Text('Play offline'),
+                            )
+                          else if (entry.status == DownloadStatus.failed ||
+                              entry.status == DownloadStatus.paused)
+                            FilledButton.tonalIcon(
+                              onPressed: isBusy ? null : () => handleRetry(),
+                              icon: Icon(primaryRecoveryIcon),
+                              label: Text(primaryRecoveryLabel),
+                            ),
+                          TextButton(
+                            onPressed: isBusy ? null : onOpenSeries,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Open series'),
+                          ),
+                          TextButton(
+                            onPressed: isBusy ? null : () => handleRemove(),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Remove'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (onPlayOffline != null)
-                    FilledButton.tonalIcon(
-                      onPressed: isBusy ? null : onPlayOffline,
-                      icon: const Icon(Icons.offline_pin_rounded),
-                      label: const Text('Play offline'),
-                    )
-                  else if (entry.status == DownloadStatus.failed ||
-                      entry.status == DownloadStatus.paused)
-                    FilledButton.tonalIcon(
-                      onPressed: isBusy ? null : () => handleRetry(),
-                      icon: Icon(primaryRecoveryIcon),
-                      label: Text(primaryRecoveryLabel),
-                    ),
-                  TextButton(
-                    onPressed: isBusy ? null : onOpenSeries,
-                    child: const Text('Open series'),
-                  ),
-                  TextButton(
-                    onPressed: isBusy ? null : () => handleRemove(),
-                    child: const Text('Remove'),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -470,49 +583,6 @@ class _DownloadsState extends StatelessWidget {
   }
 }
 
-class _SurfaceBlock extends StatelessWidget {
-  const _SurfaceBlock({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Padding(padding: const EdgeInsets.all(16), child: child),
-    );
-  }
-}
-
-class _Poster extends StatelessWidget {
-  const _Poster({required this.imageUrl, required this.label});
-
-  final String? imageUrl;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 72,
-        child: AspectRatio(
-          aspectRatio: 2 / 3,
-          child: AnimeCachedArtwork(
-            imageUrl: imageUrl,
-            label: label,
-            icon: Icons.movie_creation_outlined,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Badge extends StatelessWidget {
   const _Badge({required this.label, required this.color});
 
@@ -531,6 +601,40 @@ class _Badge extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+      ),
+    );
+  }
+}
+
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
