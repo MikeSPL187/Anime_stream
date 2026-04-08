@@ -187,18 +187,18 @@ class _SearchBody extends StatelessWidget {
         final otherResults = seriesList.skip(1).toList(growable: false);
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           children: [
             _TopResultTile(series: topMatch),
             if (otherResults.isNotEmpty) ...[
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
               Text(
                 'More results',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 10),
               for (var index = 0; index < otherResults.length; index++) ...[
-                if (index > 0) const Divider(height: 20),
+                if (index > 0) const SizedBox(height: 12),
                 _SearchResultRow(series: otherResults[index]),
               ],
             ],
@@ -218,92 +218,111 @@ class _TopResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final metadata = <String>[
+      'Top match',
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
     ].join(' • ');
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
+        borderRadius: BorderRadius.circular(20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            height: 292,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                SizedBox(
-                  width: 96,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: 2 / 3,
-                      child: AnimeCachedArtwork(
-                        imageUrl: series.posterImageUrl,
-                        label: series.title,
-                        icon: Icons.movie_creation_outlined,
+                AnimeCachedArtwork(
+                  imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
+                  label: series.title,
+                  icon: Icons.movie_creation_outlined,
+                  alignment: Alignment.topCenter,
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.04),
+                          Colors.black.withValues(alpha: 0.14),
+                          Colors.black.withValues(alpha: 0.92),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Top match',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: theme.colorScheme.primary,
-                          ),
+                const Positioned(
+                  left: 14,
+                  top: 14,
+                  child: _OverlayPill(
+                    label: 'Top match',
+                    icon: Icons.search_rounded,
+                  ),
+                ),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: 14,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        metadata,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
-                        const SizedBox(height: 6),
-                        Text(series.title, style: theme.textTheme.titleLarge),
-                        if (metadata.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            metadata,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        series.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          height: 1.03,
+                        ),
+                      ),
+                      if ((series.originalTitle ?? '').trim().isNotEmpty &&
+                          series.originalTitle != series.title) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          series.originalTitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.82),
                           ),
-                        ],
-                        if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            series.synopsis!,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 10),
-                        TextButton.icon(
-                          onPressed: () => context.push(
-                            AppRoutePaths.seriesDetails(series.id),
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            minimumSize: Size.zero,
-                          ),
-                          icon: const Icon(
-                            Icons.chevron_right_rounded,
-                            size: 18,
-                          ),
-                          label: const Text('Open series'),
                         ),
                       ],
-                    ),
+                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          series.synopsis!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            height: 1.24,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: () => context.push(
+                          AppRoutePaths.seriesDetails(series.id),
+                        ),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Open series'),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -332,62 +351,94 @@ class _SearchResultRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => context.push(AppRoutePaths.seriesDetails(series.id)),
-        borderRadius: BorderRadius.circular(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 74,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: AspectRatio(
-                  aspectRatio: 2 / 3,
-                  child: AnimeCachedArtwork(
-                    imageUrl: series.posterImageUrl,
-                    label: series.title,
-                    icon: Icons.movie_creation_outlined,
+        borderRadius: BorderRadius.circular(18),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            height: 114,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimeCachedArtwork(
+                  imageUrl: series.bannerImageUrl ?? series.posterImageUrl,
+                  label: series.title,
+                  icon: Icons.movie_creation_outlined,
+                  alignment: Alignment.topCenter,
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.88),
+                          Colors.black.withValues(alpha: 0.7),
+                          Colors.black.withValues(alpha: 0.28),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(series.title, style: theme.textTheme.titleMedium),
-                    if (metadata.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                Positioned(
+                  left: 14,
+                  top: 14,
+                  bottom: 14,
+                  right: 46,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        metadata,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    if ((series.synopsis ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        series.synopsis!,
+                        series.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          height: 1.08,
                         ),
                       ),
+                      if (metadata.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          metadata,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.78),
+                          ),
+                        ),
+                      ],
+                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: Text(
+                            series.synopsis!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.88),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
+                Positioned(
+                  top: 0,
+                  bottom: 0,
+                  right: 10,
+                  child: Center(
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white.withValues(alpha: 0.88),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -437,6 +488,40 @@ class _SearchState extends StatelessWidget {
               if (action != null) ...[const SizedBox(height: 16), action!],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );
