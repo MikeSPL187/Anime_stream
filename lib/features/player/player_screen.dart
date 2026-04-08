@@ -1651,9 +1651,7 @@ class _PlaybackTimelineState extends State<_PlaybackTimeline> {
                       ),
                     ),
                     Text(
-                      hasDuration
-                          ? _formatPlaybackDuration(duration)
-                          : 'Duration unknown',
+                      hasDuration ? _formatPlaybackDuration(duration) : '',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: widget.textColor.withValues(alpha: 0.78),
                       ),
