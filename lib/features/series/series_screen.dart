@@ -567,7 +567,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Choose where to watch next. Progress, offline state, and episode actions stay attached to each row.',
+          'Primary play path stays first. Secondary actions move into the overflow menu.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -680,7 +680,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
 
     return switch (action.kind) {
       SeriesPrimaryWatchActionKind.resumeEpisode => const _EpisodeActionHint(
-        label: 'Resume here',
+        label: 'Resume',
         tone: _EpisodeActionHintTone.primary,
       ),
       SeriesPrimaryWatchActionKind.continueEpisode => const _EpisodeActionHint(
@@ -688,7 +688,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
         tone: _EpisodeActionHintTone.secondary,
       ),
       SeriesPrimaryWatchActionKind.startWatching => const _EpisodeActionHint(
-        label: 'Start here',
+        label: 'Start',
         tone: _EpisodeActionHintTone.primary,
       ),
       _ => null,
@@ -798,20 +798,11 @@ class _EpisodeRow extends ConsumerWidget {
     final isBusy =
         downloadActionState.isLoading || watchStateOperation.isLoading;
 
-    final statusParts = <String>[
-      'Episode ${episode.numberLabel}',
-      if (episode.duration != null) '${episode.duration!.inMinutes} min',
-      if (episode.isRecap) 'Recap',
-      if (episode.isFiller) 'Filler',
-      if (savedProgress?.isCompleted == true) 'Completed',
-      if (savedProgress != null && savedProgress?.isCompleted != true)
-        'In progress',
-      if (downloadEntry?.isPlayableOffline == true) 'Available offline',
-      if (downloadEntry?.status == DownloadStatus.downloading) 'Downloading',
-      if (downloadEntry?.status == DownloadStatus.queued) 'Queued',
-      if (downloadEntry?.status == DownloadStatus.failed) 'Download failed',
-    ];
-
+    final compactStatus = _buildCompactStatus(
+      episode: episode,
+      savedProgress: savedProgress,
+      downloadEntry: downloadEntry,
+    );
     final progressFraction = switch (savedProgress) {
       final progress? when progress.isCompleted => 1.0,
       final progress?
@@ -846,6 +837,10 @@ class _EpisodeRow extends ConsumerWidget {
       null => _EpisodeRowMenuAction.downloadEpisode,
     };
 
+    final primaryActionLabel = downloadEntry?.isPlayableOffline == true
+        ? 'Play offline'
+        : 'Play episode';
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -859,175 +854,178 @@ class _EpisodeRow extends ConsumerWidget {
         child: Container(
           color: backgroundColor,
           padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 122,
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: AnimeCachedArtwork(
-                      imageUrl:
-                          episode.thumbnailImageUrl ?? series.posterImageUrl,
-                      label: episode.title.trim().isEmpty
-                          ? 'Episode ${episode.numberLabel}'
-                          : episode.title,
-                      icon: Icons.movie_creation_outlined,
-                      alignment: Alignment.topCenter,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          'EP ${episode.numberLabel}',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (actionHint != null)
-                          Text(
-                            actionHint!.label,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color:
-                                  actionHint!.tone ==
-                                      _EpisodeActionHintTone.secondary
-                                  ? theme.colorScheme.secondary
-                                  : theme.colorScheme.primary,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compactWidth = constraints.maxWidth < 430;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: compactWidth ? 108 : 122,
+                          child: AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: AnimeCachedArtwork(
+                              imageUrl:
+                                  episode.thumbnailImageUrl ??
+                                  series.posterImageUrl,
+                              label: episode.title.trim().isEmpty
+                                  ? 'Episode ${episode.numberLabel}'
+                                  : episode.title,
+                              icon: Icons.movie_creation_outlined,
+                              alignment: Alignment.topCenter,
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      episode.title.trim().isEmpty
-                          ? 'Episode ${episode.numberLabel}'
-                          : episode.title,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      statusParts.join(' • '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if ((episode.synopsis ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        episode.synopsis!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ],
-                    if (savedProgress != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        savedProgress!.isCompleted
-                            ? 'Watched'
-                            : savedProgress!.totalDuration != null
-                            ? '${_formatPlaybackPosition(savedProgress!.position)} / ${_formatPlaybackPosition(savedProgress!.totalDuration!)} watched'
-                            : '${_formatPlaybackPosition(savedProgress!.position)} watched',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'EP ${episode.numberLabel}',
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  if (actionHint != null)
+                                    _EpisodeInlineTag(
+                                      label: actionHint!.label,
+                                      tone: actionHint!.tone,
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                episode.title.trim().isEmpty
+                                    ? 'Episode ${episode.numberLabel}'
+                                    : episode.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              if (compactStatus.isNotEmpty) ...[
+                                const SizedBox(height: 5),
+                                Text(
+                                  compactStatus,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                              if (savedProgress != null) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  _progressLabel(savedProgress!),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
-                    ],
-                    if (progressFraction != null) ...[
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: progressFraction,
-                          minHeight: 5,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Column(
-                children: [
-                  IconButton(
-                    onPressed: isBusy
-                        ? null
-                        : () => _openEpisodeInPlayer(
+                      const SizedBox(width: 8),
+                      PopupMenuButton<_EpisodeRowMenuAction>(
+                        enabled: !isBusy,
+                        tooltip: 'Episode actions',
+                        position: PopupMenuPosition.under,
+                        onSelected: (action) async {
+                          await _handleEpisodeMenuAction(
                             context,
-                            series: series,
-                            episode: episode,
+                            ref,
+                            action,
+                            downloadKey: downloadKey,
+                            downloadEntry: downloadEntry,
+                          );
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<_EpisodeRowMenuAction>(
+                            value: _EpisodeRowMenuAction.play,
+                            child: Text('Play episode'),
                           ),
-                    icon: Icon(
-                      downloadEntry?.isPlayableOffline == true
-                          ? Icons.offline_pin_rounded
-                          : Icons.play_circle_fill_rounded,
-                      color: theme.colorScheme.primary,
-                    ),
-                    tooltip: downloadEntry?.isPlayableOffline == true
-                        ? 'Play offline'
-                        : 'Play episode',
-                  ),
-                  PopupMenuButton<_EpisodeRowMenuAction>(
-                    enabled: !isBusy,
-                    tooltip: 'Episode actions',
-                    onSelected: (action) async {
-                      await _handleEpisodeMenuAction(
-                        context,
-                        ref,
-                        action,
-                        downloadKey: downloadKey,
-                        downloadEntry: downloadEntry,
-                      );
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem<_EpisodeRowMenuAction>(
-                        value: _EpisodeRowMenuAction.play,
-                        child: Text('Play episode'),
-                      ),
-                      PopupMenuItem<_EpisodeRowMenuAction>(
-                        value: downloadMenuAction,
-                        enabled:
-                            downloadMenuAction !=
-                            _EpisodeRowMenuAction.downloadInProgress,
-                        child: Text(downloadMenuAction.label),
-                      ),
-                      const PopupMenuDivider(),
-                      PopupMenuItem<_EpisodeRowMenuAction>(
-                        value: watchedMenuAction,
-                        child: Text(watchedMenuAction.label),
+                          PopupMenuItem<_EpisodeRowMenuAction>(
+                            value: downloadMenuAction,
+                            enabled:
+                                downloadMenuAction !=
+                                _EpisodeRowMenuAction.downloadInProgress,
+                            child: Text(downloadMenuAction.label),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem<_EpisodeRowMenuAction>(
+                            value: watchedMenuAction,
+                            child: Text(watchedMenuAction.label),
+                          ),
+                        ],
+                        icon: isBusy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                Icons.more_vert_rounded,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                       ),
                     ],
-                    icon: isBusy
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            Icons.more_vert_rounded,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                  ),
+                  if (progressFraction != null) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: progressFraction,
+                        minHeight: 5,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: isBusy
+                            ? null
+                            : () => _openEpisodeInPlayer(
+                                context,
+                                series: series,
+                                episode: episode,
+                              ),
+                        icon: Icon(
+                          downloadEntry?.isPlayableOffline == true
+                              ? Icons.offline_pin_rounded
+                              : Icons.play_circle_fill_rounded,
+                        ),
+                        label: Text(primaryActionLabel),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -1138,6 +1136,43 @@ void _openEpisodeInPlayer(
   );
 }
 
+String _buildCompactStatus({
+  required Episode episode,
+  required EpisodeProgress? savedProgress,
+  required DownloadEntry? downloadEntry,
+}) {
+  final parts = <String>[
+    if (episode.duration != null) '${episode.duration!.inMinutes} min',
+    if (savedProgress?.isCompleted == true)
+      'Completed'
+    else if (savedProgress != null)
+      'In progress',
+    if (downloadEntry?.isPlayableOffline == true)
+      'Offline'
+    else if (downloadEntry?.status == DownloadStatus.downloading)
+      'Downloading'
+    else if (downloadEntry?.status == DownloadStatus.queued)
+      'Queued'
+    else if (downloadEntry?.status == DownloadStatus.failed)
+      'Download failed',
+    if (episode.isRecap) 'Recap' else if (episode.isFiller) 'Filler',
+  ];
+
+  return parts.take(3).join(' • ');
+}
+
+String _progressLabel(EpisodeProgress progress) {
+  if (progress.isCompleted) {
+    return 'Watched';
+  }
+
+  if (progress.totalDuration != null) {
+    return '${_formatPlaybackPosition(progress.position)} / ${_formatPlaybackPosition(progress.totalDuration!)}';
+  }
+
+  return _formatPlaybackPosition(progress.position);
+}
+
 class _OverlayPill extends StatelessWidget {
   const _OverlayPill({required this.label, required this.icon});
 
@@ -1190,6 +1225,37 @@ class _HeaderChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _EpisodeInlineTag extends StatelessWidget {
+  const _EpisodeInlineTag({required this.label, required this.tone});
+
+  final String label;
+  final _EpisodeActionHintTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = tone == _EpisodeActionHintTone.secondary
+        ? theme.colorScheme.secondary
+        : theme.colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
           color: color,
           fontWeight: FontWeight.w700,
         ),
