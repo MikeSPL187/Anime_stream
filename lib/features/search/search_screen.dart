@@ -8,6 +8,7 @@ import '../../app/router/app_router.dart';
 import '../../app/search/search_providers.dart';
 import '../../domain/models/series.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
+import '../../shared/widgets/media_overlay_pill.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -259,7 +260,7 @@ class _TopResultTile extends StatelessWidget {
                 const Positioned(
                   left: 14,
                   top: 14,
-                  child: _OverlayPill(
+                  child: MediaOverlayPill(
                     label: 'Top match',
                     icon: Icons.search_rounded,
                   ),
@@ -488,40 +489,6 @@ class _SearchState extends StatelessWidget {
               if (action != null) ...[const SizedBox(height: 16), action!],
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OverlayPill extends StatelessWidget {
-  const _OverlayPill({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: Colors.white),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
         ),
       ),
     );

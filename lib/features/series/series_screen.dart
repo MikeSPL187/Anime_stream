@@ -13,6 +13,7 @@ import '../../domain/models/episode.dart';
 import '../../domain/models/episode_progress.dart';
 import '../../domain/models/series.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
+import '../../shared/widgets/media_overlay_pill.dart';
 import '../player/player_screen_context.dart';
 
 class SeriesScreen extends ConsumerWidget {
@@ -134,7 +135,7 @@ class _SeriesHero extends StatelessWidget {
                 const Positioned(
                   left: 16,
                   top: 16,
-                  child: _OverlayPill(
+                  child: MediaOverlayPill(
                     label: 'Series hub',
                     icon: Icons.play_circle_fill_rounded,
                   ),
@@ -1171,40 +1172,6 @@ String _progressLabel(EpisodeProgress progress) {
   }
 
   return _formatPlaybackPosition(progress.position);
-}
-
-class _OverlayPill extends StatelessWidget {
-  const _OverlayPill({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: Colors.white),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _HeaderChip extends StatelessWidget {
