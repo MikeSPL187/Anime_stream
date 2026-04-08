@@ -13,6 +13,7 @@ import '../../domain/models/watchlist_entry.dart';
 import '../../domain/models/watchlist_snapshot.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
 import '../../shared/widgets/media_overlay_pill.dart';
+import '../player/player_screen_context.dart';
 
 class MyListsScreen extends ConsumerWidget {
   const MyListsScreen({super.key});
@@ -145,7 +146,8 @@ class _WatchlistSection extends StatelessWidget {
       ),
       error: (error, stackTrace) => _SectionMessage(
         title: 'Watchlist',
-        message: 'Saved titles could not be loaded.\n$error',
+        message:
+            'Saved titles could not be loaded right now. Pull to refresh to retry.',
       ),
       data: (snapshot) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,7 +223,8 @@ class _DownloadsSection extends StatelessWidget {
       ),
       error: (error, stackTrace) => _SectionMessage(
         title: 'Downloads',
-        message: 'Offline entries could not be loaded.\n$error',
+        message:
+            'Offline entries could not be loaded right now. Pull to refresh to retry.',
       ),
       data: (entries) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,7 +278,8 @@ class _HistorySection extends StatelessWidget {
       ),
       error: (error, stackTrace) => _SectionMessage(
         title: 'History',
-        message: 'Watch history could not be loaded.\n$error',
+        message:
+            'Watch history could not be loaded right now. Pull to refresh to retry.',
       ),
       data: (entries) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,9 +348,14 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final episodeTitle = entry.episode.title.trim().isEmpty
-        ? 'Episode ${entry.episode.numberLabel}'
-        : entry.episode.title;
+    final episodeTitle = _resolvedEpisodeTitle();
+    final playerContext = PlayerScreenContext(
+      seriesId: entry.series.id,
+      seriesTitle: entry.series.title,
+      episodeId: entry.episode.id,
+      episodeNumberLabel: entry.episode.numberLabel,
+      episodeTitle: episodeTitle,
+    );
 
     return _MediaShelfCard(
       imageUrl: entry.series.posterImageUrl,
@@ -356,8 +365,17 @@ class _HistoryCard extends StatelessWidget {
           'Episode ${entry.episode.numberLabel} • Watched ${_formatHistoryDate(entry.watchedAt)}',
       pillLabel: 'History',
       pillIcon: Icons.history_rounded,
-      onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
+      onTap: () => context.push(AppRoutePaths.player, extra: playerContext),
     );
+  }
+
+  String _resolvedEpisodeTitle() {
+    final episodeTitle = entry.episode.title.trim();
+    if (episodeTitle.isNotEmpty) {
+      return episodeTitle;
+    }
+
+    return 'Episode ${entry.episode.numberLabel}';
   }
 }
 
@@ -372,27 +390,37 @@ class _DownloadPreviewCard extends ConsumerWidget {
     return content.when(
       loading: () => _MediaShelfCard(
         imageUrl: null,
-        title: entry.seriesId,
-        subtitle: 'Episode ${entry.episodeId}',
+        title: entry.displaySeriesTitle,
+        subtitle: entry.displayEpisodeLabel,
         metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
         pillLabel: _downloadPillLabel(entry),
         pillIcon: _downloadPillIcon(entry),
-        onTap: () => context.push(AppRoutePaths.downloads),
+        onTap: _buildFallbackTapAction(context),
       ),
       error: (error, stackTrace) => _MediaShelfCard(
         imageUrl: null,
-        title: entry.seriesId,
-        subtitle: 'Episode ${entry.episodeId}',
+        title: entry.displaySeriesTitle,
+        subtitle: entry.displayEpisodeLabel,
         metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
         pillLabel: _downloadPillLabel(entry),
         pillIcon: _downloadPillIcon(entry),
-        onTap: () => context.push(AppRoutePaths.downloads),
+        onTap: _buildFallbackTapAction(context),
       ),
       data: (content) {
         final episode = content.episodeById(entry.episodeId);
-        final episodeLabel = episode == null
-            ? 'Episode ${entry.episodeId}'
-            : 'Episode ${episode.numberLabel}';
+        final episodeNumberLabel =
+            episode?.numberLabel ?? entry.displayEpisodeNumberLabel;
+        final episodeLabel = 'Episode $episodeNumberLabel';
+        final episodeTitle = episode == null || episode.title.trim().isEmpty
+            ? entry.displayEpisodeTitle
+            : episode.title;
+        final playerContext = PlayerScreenContext(
+          seriesId: content.series.id,
+          seriesTitle: content.series.title,
+          episodeId: entry.episodeId,
+          episodeNumberLabel: episodeNumberLabel,
+          episodeTitle: episodeTitle,
+        );
         return _MediaShelfCard(
           imageUrl: content.series.posterImageUrl,
           title: content.series.title,
@@ -400,10 +428,34 @@ class _DownloadPreviewCard extends ConsumerWidget {
           metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
           pillLabel: _downloadPillLabel(entry),
           pillIcon: _downloadPillIcon(entry),
-          onTap: () => context.push(AppRoutePaths.downloads),
+          onTap: () => _handleTap(context, playerContext: playerContext),
         );
       },
     );
+  }
+
+  VoidCallback _buildFallbackTapAction(BuildContext context) {
+    final playerContext = PlayerScreenContext(
+      seriesId: entry.seriesId,
+      seriesTitle: entry.displaySeriesTitle,
+      episodeId: entry.episodeId,
+      episodeNumberLabel: entry.displayEpisodeNumberLabel,
+      episodeTitle: entry.displayEpisodeTitle,
+    );
+
+    return () => _handleTap(context, playerContext: playerContext);
+  }
+
+  void _handleTap(
+    BuildContext context, {
+    required PlayerScreenContext playerContext,
+  }) {
+    if (entry.isPlayableOffline) {
+      context.push(AppRoutePaths.player, extra: playerContext);
+      return;
+    }
+
+    context.push(AppRoutePaths.downloads);
   }
 }
 

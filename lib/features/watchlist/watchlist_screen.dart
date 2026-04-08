@@ -26,20 +26,26 @@ class WatchlistScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Watchlist')),
-      body: watchlist.when(
-        loading: () => const _CenteredState(
-          icon: Icons.bookmark_rounded,
-          title: 'Loading Watchlist',
-          message: 'Saved titles are being loaded.',
-        ),
-        error: (error, stackTrace) => _CenteredState(
-          icon: Icons.error_outline_rounded,
-          title: 'Watchlist unavailable',
-          message: 'Saved titles could not be loaded.\n$error',
-        ),
-        data: (snapshot) => RefreshIndicator(
-          onRefresh: refreshWatchlist,
-          child: _WatchlistBody(snapshot: snapshot),
+      body: RefreshIndicator(
+        onRefresh: refreshWatchlist,
+        child: watchlist.when(
+          loading: () => const _CenteredState(
+            icon: Icons.bookmark_rounded,
+            title: 'Loading Watchlist',
+            message: 'Saved titles are being loaded.',
+          ),
+          error: (error, stackTrace) => _CenteredState(
+            icon: Icons.error_outline_rounded,
+            title: 'Watchlist unavailable',
+            message:
+                'Saved titles could not be loaded right now. Pull to refresh or retry.',
+            action: FilledButton.icon(
+              onPressed: refreshWatchlist,
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Retry'),
+            ),
+          ),
+          data: (snapshot) => _WatchlistBody(snapshot: snapshot),
         ),
       ),
     );
@@ -277,43 +283,52 @@ class _CenteredState extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
+    this.action,
   });
 
   final IconData icon;
   final String title;
   final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40, color: theme.colorScheme.primary),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: theme.textTheme.headlineSmall,
-                textAlign: TextAlign.center,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 420),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 40, color: theme.colorScheme.primary),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: theme.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (action != null) ...[const SizedBox(height: 16), action!],
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

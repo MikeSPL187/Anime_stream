@@ -19,6 +19,9 @@ class DownloadEntry {
     required this.episodeId,
     required this.selectedQuality,
     required this.status,
+    this.seriesTitle,
+    this.episodeNumberLabel,
+    this.episodeTitle,
     this.bytesDownloaded = 0,
     this.totalBytes,
     this.localAssetUri,
@@ -35,6 +38,9 @@ class DownloadEntry {
   final String episodeId;
   final String selectedQuality;
   final DownloadStatus status;
+  final String? seriesTitle;
+  final String? episodeNumberLabel;
+  final String? episodeTitle;
   final int bytesDownloaded;
   final int? totalBytes;
   final String? localAssetUri;
@@ -74,12 +80,44 @@ class DownloadEntry {
     };
   }
 
+  String get displaySeriesTitle {
+    final title = seriesTitle?.trim();
+    if (title != null && title.isNotEmpty) {
+      return title;
+    }
+
+    return seriesId;
+  }
+
+  String get displayEpisodeNumberLabel {
+    final numberLabel = episodeNumberLabel?.trim();
+    if (numberLabel != null && numberLabel.isNotEmpty) {
+      return numberLabel;
+    }
+
+    return episodeId;
+  }
+
+  String get displayEpisodeLabel => 'Episode $displayEpisodeNumberLabel';
+
+  String get displayEpisodeTitle {
+    final title = episodeTitle?.trim();
+    if (title != null && title.isNotEmpty) {
+      return title;
+    }
+
+    return displayEpisodeLabel;
+  }
+
   DownloadEntry copyWith({
     String? id,
     String? seriesId,
     String? episodeId,
     String? selectedQuality,
     DownloadStatus? status,
+    String? seriesTitle,
+    String? episodeNumberLabel,
+    String? episodeTitle,
     int? bytesDownloaded,
     int? totalBytes,
     String? localAssetUri,
@@ -96,6 +134,9 @@ class DownloadEntry {
       episodeId: episodeId ?? this.episodeId,
       selectedQuality: selectedQuality ?? this.selectedQuality,
       status: status ?? this.status,
+      seriesTitle: seriesTitle ?? this.seriesTitle,
+      episodeNumberLabel: episodeNumberLabel ?? this.episodeNumberLabel,
+      episodeTitle: episodeTitle ?? this.episodeTitle,
       bytesDownloaded: bytesDownloaded ?? this.bytesDownloaded,
       totalBytes: totalBytes ?? this.totalBytes,
       localAssetUri: localAssetUri ?? this.localAssetUri,
@@ -115,6 +156,9 @@ class DownloadEntry {
       'episodeId': episodeId,
       'selectedQuality': selectedQuality,
       'status': status.name,
+      'seriesTitle': seriesTitle,
+      'episodeNumberLabel': episodeNumberLabel,
+      'episodeTitle': episodeTitle,
       'bytesDownloaded': bytesDownloaded,
       'totalBytes': totalBytes,
       'localAssetUri': localAssetUri,
@@ -136,6 +180,9 @@ class DownloadEntry {
       episodeId: json['episodeId'] as String? ?? '',
       selectedQuality: json['selectedQuality'] as String? ?? '1080p',
       status: status,
+      seriesTitle: json['seriesTitle'] as String?,
+      episodeNumberLabel: json['episodeNumberLabel'] as String?,
+      episodeTitle: json['episodeTitle'] as String?,
       bytesDownloaded: (json['bytesDownloaded'] as num?)?.toInt() ?? 0,
       totalBytes: (json['totalBytes'] as num?)?.toInt(),
       localAssetUri: json['localAssetUri'] as String?,

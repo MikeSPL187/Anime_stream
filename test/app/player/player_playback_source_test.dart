@@ -52,5 +52,29 @@ void main() {
       expect(source.supportsManualQualitySelection, isFalse);
       expect(source.qualityOptions(activeVariantIndex: 0), isEmpty);
     });
+
+    test('refreshes source on retry only for remote playback variants', () {
+      final remoteSource = PlayerPlaybackSource(
+        variants: const [
+          PlayerPlaybackVariant(
+            sourceUri: 'https://cdn.example.com/episode-3-1080.m3u8',
+            qualityLabel: '1080p',
+            kind: PlayerPlaybackSourceKind.remoteHls,
+          ),
+        ],
+      );
+      final offlineSource = PlayerPlaybackSource(
+        variants: const [
+          PlayerPlaybackVariant(
+            sourceUri: 'file:///downloads/episode-3/index.m3u8',
+            qualityLabel: '1080p offline',
+            kind: PlayerPlaybackSourceKind.localHlsManifest,
+          ),
+        ],
+      );
+
+      expect(remoteSource.shouldRefreshSourceOnRetry, isTrue);
+      expect(offlineSource.shouldRefreshSourceOnRetry, isFalse);
+    });
   });
 }

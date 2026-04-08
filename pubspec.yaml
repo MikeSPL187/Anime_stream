@@ -1,5 +1,5 @@
 name: anime_stream_app
-description: "A new Flutter project."
+description: "Single-user anime streaming app focused on Crunchyroll-like mobile watch flow."
 publish_to: 'none'
 version: 0.1.0+1
 

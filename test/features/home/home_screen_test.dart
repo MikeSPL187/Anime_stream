@@ -78,6 +78,71 @@ void main() {
     expect(continueWatchingRequests, 2);
     expect(discoveryRequests, 2);
   });
+
+  testWidgets('Home retries discovery from the inline error action', (
+    tester,
+  ) async {
+    var discoveryRequests = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          homeContinueWatchingProvider.overrideWith(
+            (ref) async => const <HomeContinueWatchingItem>[],
+          ),
+          homeDiscoveryProvider.overrideWith((ref) async {
+            discoveryRequests += 1;
+            if (discoveryRequests == 1) {
+              throw StateError('discovery failed');
+            }
+            return HomeDiscoveryData(
+              latestReleases: [_series(id: 'latest-2')],
+              trendingSeries: const [],
+              popularSeries: const [],
+            );
+          }),
+        ],
+        child: const MaterialApp(home: HomeScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Latest Spotlight'), findsOneWidget);
+    expect(find.text('Retry'), findsWidgets);
+
+    await tester.tap(find.text('Retry').first);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(discoveryRequests, 2);
+    expect(find.text('Open Series'), findsOneWidget);
+  });
+
+  testWidgets('Home latest spotlight keeps an honest browse CTA label', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          homeContinueWatchingProvider.overrideWith(
+            (ref) async => const <HomeContinueWatchingItem>[],
+          ),
+          homeDiscoveryProvider.overrideWith(
+            (ref) async => HomeDiscoveryData(
+              latestReleases: [_series(id: 'latest-1')],
+              trendingSeries: const [],
+              popularSeries: const [],
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: HomeScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open Browse'), findsOneWidget);
+    expect(find.text('Browse latest'), findsNothing);
+  });
 }
 
 HomeContinueWatchingItem _homeContinueWatchingItem() {

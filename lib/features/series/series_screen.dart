@@ -6,10 +6,13 @@ import '../../app/downloads/downloads_providers.dart';
 import '../../app/router/app_router.dart';
 import '../../app/series/series_details_data.dart';
 import '../../app/series/series_providers.dart';
+import '../../app/settings/playback_preferences_providers.dart';
 import '../../app/watch/watch_state_operation_providers.dart';
 import '../../app/watchlist/watchlist_providers.dart';
 import '../../domain/models/download_entry.dart';
 import '../../domain/models/episode.dart';
+import '../../domain/models/episode_selector.dart';
+import '../../domain/models/playback_preferences.dart';
 import '../../domain/models/episode_progress.dart';
 import '../../domain/models/series.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
@@ -496,7 +499,7 @@ class _SaveIntentSection extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Text(
-            'The saved-for-later state could not be loaded right now.\n$error',
+            'The saved-for-later state could not be loaded right now. Refresh this page to retry.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -705,7 +708,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
         : sortedEpisodes.reversed.toList(growable: false);
     final inProgressCount = details.inProgressEpisodeCount;
     final watchedCount = details.completedEpisodeCount;
-    final unwatchedCount =
+    final notStartedCount =
         sortedEpisodes.length - inProgressCount - watchedCount;
     final effectiveFilter = watchStateAvailable
         ? _selectedFilter
@@ -804,11 +807,11 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
                 ),
                 const SizedBox(width: 8),
                 _EpisodeFilterButton(
-                  label: 'Unwatched',
-                  count: unwatchedCount,
-                  isSelected: effectiveFilter == _EpisodeListFilter.unwatched,
+                  label: 'Not Started',
+                  count: notStartedCount,
+                  isSelected: effectiveFilter == _EpisodeListFilter.notStarted,
                   onTap: () => setState(
-                    () => _selectedFilter = _EpisodeListFilter.unwatched,
+                    () => _selectedFilter = _EpisodeListFilter.notStarted,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -840,7 +843,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
                       'No episodes are available right now.',
                     _EpisodeListFilter.continueWatching =>
                       'No episodes are currently in progress for this series.',
-                    _EpisodeListFilter.unwatched =>
+                    _EpisodeListFilter.notStarted =>
                       'Every available episode already has watch-state activity.',
                     _EpisodeListFilter.watched =>
                       'No episodes have been marked watched yet.',
@@ -879,7 +882,7 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
       _EpisodeListFilter.continueWatching => details.isEpisodeInProgress(
         episode.id,
       ),
-      _EpisodeListFilter.unwatched => !details.hasSavedProgress(episode.id),
+      _EpisodeListFilter.notStarted => !details.hasSavedProgress(episode.id),
       _EpisodeListFilter.watched => details.isEpisodeCompleted(episode.id),
     };
   }
@@ -1305,8 +1308,39 @@ class _EpisodeRow extends ConsumerWidget {
           await watchController.markEpisodeUnwatched(episode.id);
           break;
         case _EpisodeRowMenuAction.downloadEpisode:
+          final selectedQuality = await _selectDownloadQuality(
+            context,
+            ref,
+            preselectedQuality: null,
+          );
+          if (selectedQuality == null) {
+            return;
+          }
+          await downloadController.startDownload(
+            selectedQuality: selectedQuality,
+            seriesTitle: series.title,
+            episodeNumberLabel: episode.numberLabel,
+            episodeTitle: episode.title.trim().isEmpty ? null : episode.title,
+          );
+          break;
         case _EpisodeRowMenuAction.retryDownload:
-          await downloadController.startDownload();
+          final selectedQuality =
+              downloadEntry?.selectedQuality.trim().isNotEmpty == true
+              ? downloadEntry!.selectedQuality
+              : await _selectDownloadQuality(
+                  context,
+                  ref,
+                  preselectedQuality: null,
+                );
+          if (selectedQuality == null) {
+            return;
+          }
+          await downloadController.startDownload(
+            selectedQuality: selectedQuality,
+            seriesTitle: series.title,
+            episodeNumberLabel: episode.numberLabel,
+            episodeTitle: episode.title.trim().isEmpty ? null : episode.title,
+          );
           break;
         case _EpisodeRowMenuAction.removeDownload:
           final downloadId = downloadEntry?.id;
@@ -1328,7 +1362,7 @@ class _EpisodeRow extends ConsumerWidget {
         ..showSnackBar(
           SnackBar(
             content: Text(
-              'Could not update Episode ${episode.numberLabel}.\n$error',
+              'Could not update Episode ${episode.numberLabel} right now. Try again.',
             ),
           ),
         );
@@ -1359,6 +1393,54 @@ class _EpisodeRow extends ConsumerWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
+
+  Future<String?> _selectDownloadQuality(
+    BuildContext context,
+    WidgetRef ref, {
+    required String? preselectedQuality,
+  }) async {
+    String effectivePreselectedQuality = normalizeDownloadQualityLabel(
+      preselectedQuality,
+    );
+    if (preselectedQuality == null || preselectedQuality.trim().isEmpty) {
+      try {
+        final preferences = await ref.read(
+          playbackPreferencesControllerProvider.future,
+        );
+        effectivePreselectedQuality = normalizeDownloadQualityLabel(
+          preferences.defaultDownloadQuality,
+        );
+      } catch (_) {
+        effectivePreselectedQuality = normalizeDownloadQualityLabel(null);
+      }
+    }
+
+    if (!context.mounted) {
+      return null;
+    }
+
+    final request = EpisodeDownloadQualityRequest(
+      seriesId: series.id,
+      episodeSelector: EpisodeSelector(
+        episodeId: episode.id,
+        episodeNumberLabel: episode.numberLabel,
+        episodeTitle: episode.title,
+      ),
+    );
+
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) {
+        return _EpisodeDownloadQualitySheet(
+          request: request,
+          episodeDisplayLabel: 'Episode ${episode.numberLabel}',
+          preselectedQuality: effectivePreselectedQuality,
+        );
+      },
+    );
+  }
 }
 
 void _openEpisodeInPlayer(
@@ -1376,6 +1458,130 @@ void _openEpisodeInPlayer(
       episodeTitle: episode.title,
     ),
   );
+}
+
+class _EpisodeDownloadQualitySheet extends ConsumerWidget {
+  const _EpisodeDownloadQualitySheet({
+    required this.request,
+    required this.episodeDisplayLabel,
+    required this.preselectedQuality,
+  });
+
+  final EpisodeDownloadQualityRequest request;
+  final String episodeDisplayLabel;
+  final String? preselectedQuality;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final qualityOptionsAsync = ref.watch(
+      episodeDownloadQualityOptionsProvider(request),
+    );
+
+    return qualityOptionsAsync.when(
+      loading: () => _EpisodeDownloadQualityState(
+        title: 'Choose download quality',
+        message: 'Loading offline quality options for $episodeDisplayLabel.',
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (error, stackTrace) => _EpisodeDownloadQualityState(
+        title: 'Download quality unavailable',
+        message:
+            'Offline quality options could not be loaded right now. Try again.',
+        actions: [
+          FilledButton.icon(
+            onPressed: () =>
+                ref.invalidate(episodeDownloadQualityOptionsProvider(request)),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
+        child: const SizedBox.shrink(),
+      ),
+      data: (qualityOptions) {
+        if (qualityOptions.isEmpty) {
+          return const _EpisodeDownloadQualityState(
+            title: 'Download quality unavailable',
+            message: 'No supported offline quality options are available.',
+            child: SizedBox.shrink(),
+          );
+        }
+
+        return _EpisodeDownloadQualityState(
+          title: 'Choose download quality',
+          message: 'Pick the quality to save for offline playback.',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final qualityLabel in qualityOptions)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(qualityLabel),
+                  subtitle: Text('$episodeDisplayLabel offline download'),
+                  trailing: qualityLabel == preselectedQuality
+                      ? const Icon(Icons.check_circle_rounded)
+                      : null,
+                  onTap: () => Navigator.of(context).pop(qualityLabel),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EpisodeDownloadQualityState extends StatelessWidget {
+  const _EpisodeDownloadQualityState({
+    required this.title,
+    required this.message,
+    required this.child,
+    this.actions = const [],
+  });
+
+  final String title;
+  final String message;
+  final Widget child;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            child,
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Wrap(spacing: 8, runSpacing: 8, children: actions),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 String _buildCompactStatus({
@@ -1474,7 +1680,7 @@ class _EpisodeInlineTag extends StatelessWidget {
   }
 }
 
-enum _EpisodeListFilter { all, continueWatching, unwatched, watched }
+enum _EpisodeListFilter { all, continueWatching, notStarted, watched }
 
 enum _EpisodeSortOrder {
   oldestFirst('Oldest first'),

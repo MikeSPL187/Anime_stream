@@ -13,6 +13,14 @@ class BrowseScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final browseCatalog = ref.watch(browseCatalogProvider);
+    Future<void> refreshBrowse() async {
+      ref.invalidate(browseCatalogProvider);
+      try {
+        await ref.read(browseCatalogProvider.future);
+      } catch (_) {
+        return;
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -35,18 +43,27 @@ class BrowseScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: browseCatalog.when(
-        loading: () => const _BrowseMessageState(
-          title: 'Loading browse',
-          message: 'Discovery slices are being prepared.',
-          icon: Icons.explore_outlined,
+      body: RefreshIndicator(
+        onRefresh: refreshBrowse,
+        child: browseCatalog.when(
+          loading: () => const _BrowseMessageState(
+            title: 'Loading browse',
+            message: 'Discovery slices are being prepared.',
+            icon: Icons.explore_outlined,
+          ),
+          error: (error, stackTrace) => _BrowseMessageState(
+            title: 'Browse unavailable',
+            message:
+                'Browse could not be loaded right now. Pull to refresh or retry.',
+            icon: Icons.error_outline_rounded,
+            action: FilledButton.icon(
+              onPressed: refreshBrowse,
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Retry'),
+            ),
+          ),
+          data: (catalog) => _BrowseContent(catalog: catalog),
         ),
-        error: (error, stackTrace) => _BrowseMessageState(
-          title: 'Browse unavailable',
-          message: 'Catalog browse data could not be loaded.\n$error',
-          icon: Icons.error_outline_rounded,
-        ),
-        data: (catalog) => _BrowseContent(catalog: catalog),
       ),
     );
   }
@@ -402,43 +419,52 @@ class _BrowseMessageState extends StatelessWidget {
     required this.title,
     required this.message,
     required this.icon,
+    this.action,
   });
 
   final String title;
   final String message;
   final IconData icon;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: theme.colorScheme.primary, size: 36),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: theme.textTheme.titleLarge,
-                textAlign: TextAlign.center,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 420),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: theme.colorScheme.primary, size: 36),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: theme.textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (action != null) ...[const SizedBox(height: 16), action!],
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

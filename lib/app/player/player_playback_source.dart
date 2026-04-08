@@ -59,6 +59,9 @@ class PlayerPlaybackSource {
 
   bool get isOffline => activeVariant.isOffline;
 
+  bool get shouldRefreshSourceOnRetry =>
+      kind == PlayerPlaybackSourceKind.remoteHls;
+
   bool get supportsManualQualitySelection => variants.length > 1;
 
   PlayerPlaybackVariant variantAt(int index) => variants[index];

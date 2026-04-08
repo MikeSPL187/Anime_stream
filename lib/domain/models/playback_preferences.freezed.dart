@@ -28,6 +28,7 @@ mixin _$PlaybackPreferences {
   bool get autoplayNextEpisode => throw _privateConstructorUsedError;
   bool get preferSubtitles => throw _privateConstructorUsedError;
   double get defaultPlaybackSpeed => throw _privateConstructorUsedError;
+  String get defaultDownloadQuality => throw _privateConstructorUsedError;
 
   /// Serializes this PlaybackPreferences to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -52,6 +53,7 @@ abstract class $PlaybackPreferencesCopyWith<$Res> {
     bool autoplayNextEpisode,
     bool preferSubtitles,
     double defaultPlaybackSpeed,
+    String defaultDownloadQuality,
   });
 }
 
@@ -75,6 +77,7 @@ class _$PlaybackPreferencesCopyWithImpl<$Res, $Val extends PlaybackPreferences>
     Object? autoplayNextEpisode = null,
     Object? preferSubtitles = null,
     Object? defaultPlaybackSpeed = null,
+    Object? defaultDownloadQuality = null,
   }) {
     return _then(
       _value.copyWith(
@@ -99,6 +102,10 @@ class _$PlaybackPreferencesCopyWithImpl<$Res, $Val extends PlaybackPreferences>
                 ? _value.defaultPlaybackSpeed
                 : defaultPlaybackSpeed // ignore: cast_nullable_to_non_nullable
                       as double,
+            defaultDownloadQuality: null == defaultDownloadQuality
+                ? _value.defaultDownloadQuality
+                : defaultDownloadQuality // ignore: cast_nullable_to_non_nullable
+                      as String,
           )
           as $Val,
     );
@@ -120,6 +127,7 @@ abstract class _$$PlaybackPreferencesImplCopyWith<$Res>
     bool autoplayNextEpisode,
     bool preferSubtitles,
     double defaultPlaybackSpeed,
+    String defaultDownloadQuality,
   });
 }
 
@@ -142,6 +150,7 @@ class __$$PlaybackPreferencesImplCopyWithImpl<$Res>
     Object? autoplayNextEpisode = null,
     Object? preferSubtitles = null,
     Object? defaultPlaybackSpeed = null,
+    Object? defaultDownloadQuality = null,
   }) {
     return _then(
       _$PlaybackPreferencesImpl(
@@ -165,6 +174,10 @@ class __$$PlaybackPreferencesImplCopyWithImpl<$Res>
             ? _value.defaultPlaybackSpeed
             : defaultPlaybackSpeed // ignore: cast_nullable_to_non_nullable
                   as double,
+        defaultDownloadQuality: null == defaultDownloadQuality
+            ? _value.defaultDownloadQuality
+            : defaultDownloadQuality // ignore: cast_nullable_to_non_nullable
+                  as String,
       ),
     );
   }
@@ -179,6 +192,7 @@ class _$PlaybackPreferencesImpl implements _PlaybackPreferences {
     this.autoplayNextEpisode = true,
     this.preferSubtitles = false,
     this.defaultPlaybackSpeed = 1.0,
+    this.defaultDownloadQuality = '1080p',
   }) : _preferredAudioLanguageCodes = preferredAudioLanguageCodes,
        _preferredSubtitleLanguageCodes = preferredSubtitleLanguageCodes;
 
@@ -214,10 +228,13 @@ class _$PlaybackPreferencesImpl implements _PlaybackPreferences {
   @override
   @JsonKey()
   final double defaultPlaybackSpeed;
+  @override
+  @JsonKey()
+  final String defaultDownloadQuality;
 
   @override
   String toString() {
-    return 'PlaybackPreferences(preferredAudioLanguageCodes: $preferredAudioLanguageCodes, preferredSubtitleLanguageCodes: $preferredSubtitleLanguageCodes, autoplayNextEpisode: $autoplayNextEpisode, preferSubtitles: $preferSubtitles, defaultPlaybackSpeed: $defaultPlaybackSpeed)';
+    return 'PlaybackPreferences(preferredAudioLanguageCodes: $preferredAudioLanguageCodes, preferredSubtitleLanguageCodes: $preferredSubtitleLanguageCodes, autoplayNextEpisode: $autoplayNextEpisode, preferSubtitles: $preferSubtitles, defaultPlaybackSpeed: $defaultPlaybackSpeed, defaultDownloadQuality: $defaultDownloadQuality)';
   }
 
   @override
@@ -238,7 +255,12 @@ class _$PlaybackPreferencesImpl implements _PlaybackPreferences {
             (identical(other.preferSubtitles, preferSubtitles) ||
                 other.preferSubtitles == preferSubtitles) &&
             (identical(other.defaultPlaybackSpeed, defaultPlaybackSpeed) ||
-                other.defaultPlaybackSpeed == defaultPlaybackSpeed));
+                other.defaultPlaybackSpeed == defaultPlaybackSpeed) &&
+            (identical(
+                  other.defaultDownloadQuality,
+                  defaultDownloadQuality,
+                ) ||
+                other.defaultDownloadQuality == defaultDownloadQuality));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -250,6 +272,7 @@ class _$PlaybackPreferencesImpl implements _PlaybackPreferences {
     autoplayNextEpisode,
     preferSubtitles,
     defaultPlaybackSpeed,
+    defaultDownloadQuality,
   );
 
   /// Create a copy of PlaybackPreferences
@@ -276,6 +299,7 @@ abstract class _PlaybackPreferences implements PlaybackPreferences {
     final bool autoplayNextEpisode,
     final bool preferSubtitles,
     final double defaultPlaybackSpeed,
+    final String defaultDownloadQuality,
   }) = _$PlaybackPreferencesImpl;
 
   factory _PlaybackPreferences.fromJson(Map<String, dynamic> json) =
@@ -291,6 +315,8 @@ abstract class _PlaybackPreferences implements PlaybackPreferences {
   bool get preferSubtitles;
   @override
   double get defaultPlaybackSpeed;
+  @override
+  String get defaultDownloadQuality;
 
   /// Create a copy of PlaybackPreferences
   /// with the given fields replaced by the non-null parameter values.

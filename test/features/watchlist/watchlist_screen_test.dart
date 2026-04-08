@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:anime_stream_app/app/watchlist/watchlist_providers.dart';
 import 'package:anime_stream_app/app/di/watchlist_repository_provider.dart';
 import 'package:anime_stream_app/domain/models/availability_state.dart';
 import 'package:anime_stream_app/domain/models/series.dart';
@@ -76,6 +77,38 @@ void main() {
       );
     },
   );
+
+  testWidgets('WatchlistScreen retries a failed load from the error state', (
+    tester,
+  ) async {
+    var requests = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          watchlistProvider.overrideWith((ref) async {
+            requests += 1;
+            if (requests == 1) {
+              throw StateError('watchlist failed');
+            }
+            return const WatchlistSnapshot();
+          }),
+        ],
+        child: const MaterialApp(home: WatchlistScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Watchlist unavailable'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(requests, 2);
+    expect(find.text('No saved titles yet'), findsOneWidget);
+  });
 }
 
 class _FakeWatchlistRepository implements WatchlistRepository {

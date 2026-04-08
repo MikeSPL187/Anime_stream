@@ -202,6 +202,144 @@ void main() {
     );
 
     test(
+      'packages nested HLS playlists recursively for offline playback',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_nested_manifest_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        const masterPlaylistUrl =
+            'https://cdn.example.com/series-12/master.m3u8';
+        const variantPlaylistUrl =
+            'https://cdn.example.com/series-12/variant_1080.m3u8';
+        final release = AnilibriaReleaseDto(
+          id: 'series-12',
+          episodes: [
+            const AnilibriaEpisodeDto(
+              id: 'ep-9',
+              releaseId: 'series-12',
+              ordinal: 9,
+              numberLabel: '9',
+              title: 'Episode 9',
+              hls1080Url: masterPlaylistUrl,
+            ),
+          ],
+        );
+        final dio = Dio()
+          ..interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (options, handler) {
+                final uri = options.uri.toString();
+                if (uri == masterPlaylistUrl) {
+                  handler.resolve(
+                    Response<String>(
+                      requestOptions: options,
+                      data:
+                          '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1920x1080\nvariant_1080.m3u8\n',
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+                if (uri == variantPlaylistUrl) {
+                  handler.resolve(
+                    Response<String>(
+                      requestOptions: options,
+                      data:
+                          '#EXTM3U\n#EXTINF:4.0,\nsegment_0001.ts\n#EXTINF:4.0,\nsegment_0002.ts\n#EXT-X-ENDLIST\n',
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+                if (uri ==
+                    'https://cdn.example.com/series-12/segment_0001.ts') {
+                  handler.resolve(
+                    Response<List<int>>(
+                      requestOptions: options,
+                      data: const [1, 2, 3, 4],
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+                if (uri ==
+                    'https://cdn.example.com/series-12/segment_0002.ts') {
+                  handler.resolve(
+                    Response<List<int>>(
+                      requestOptions: options,
+                      data: const [5, 6, 7, 8],
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    error: 'Unexpected request: $uri',
+                  ),
+                );
+              },
+            ),
+          );
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(
+            releaseDetails: release,
+          ),
+          dio: dio,
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        final completedEntry = await repository.startEpisodeDownload(
+          seriesId: 'series-12',
+          episodeId: 'ep-9',
+          selectedQuality: '1080p',
+        );
+
+        expect(completedEntry.status, DownloadStatus.completed);
+
+        final packageDir = Directory(
+          '${sandbox.path}/downloads/series-12/ep-9/1080p',
+        );
+        final localMasterManifest = File('${packageDir.path}/index.m3u8');
+        final localVariantManifest = File('${packageDir.path}/asset_0000.m3u8');
+        final localSegmentOne = File('${packageDir.path}/asset_0001.ts');
+        final localSegmentTwo = File('${packageDir.path}/asset_0002.ts');
+
+        expect(await localMasterManifest.exists(), isTrue);
+        expect(await localVariantManifest.exists(), isTrue);
+        expect(await localSegmentOne.exists(), isTrue);
+        expect(await localSegmentTwo.exists(), isTrue);
+
+        final masterManifestBody = await localMasterManifest.readAsString();
+        final variantManifestBody = await localVariantManifest.readAsString();
+        expect(masterManifestBody, contains('asset_0000.m3u8'));
+        expect(variantManifestBody, contains('asset_0001.ts'));
+        expect(variantManifestBody, contains('asset_0002.ts'));
+
+        final playable = await repository.getPlayableDownload(
+          seriesId: 'series-12',
+          episodeId: 'ep-9',
+        );
+
+        expect(playable, isNotNull);
+        expect(playable!.status, DownloadStatus.completed);
+      },
+    );
+
+    test(
       'demotes completed local-file entry with empty file payload',
       () async {
         final sandbox = await Directory.systemTemp.createTemp(
@@ -298,6 +436,73 @@ void main() {
         );
 
         await store.writeAll({entry.id: entry.toJson()});
+
+        final entries = await repository.getDownloads();
+        final normalized = entries.single;
+
+        expect(normalized.status, DownloadStatus.failed);
+        expect(normalized.localAssetUri, isNull);
+        expect(
+          normalized.lastError,
+          'Offline package asset is missing on device.',
+        );
+        expect(
+          normalized.failureKind,
+          DownloadFailureKind.offlinePackageMissing,
+        );
+      },
+    );
+
+    test(
+      'demotes completed HLS entry when nested manifest media asset is missing',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_nested_missing_asset_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final packageDir = Directory(
+          '${sandbox.path}/downloads/series-13/ep-2/1080p',
+        );
+        await packageDir.create(recursive: true);
+
+        final rootManifest = File('${packageDir.path}/index.m3u8');
+        final variantManifest = File('${packageDir.path}/asset_0000.m3u8');
+        await rootManifest.writeAsString(
+          '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2800000\nasset_0000.m3u8\n',
+        );
+        await variantManifest.writeAsString(
+          '#EXTM3U\n#EXTINF:4.0,\nasset_0001.ts\n#EXT-X-ENDLIST\n',
+        );
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        const entryId = 'series-13::ep-2::1080p';
+        await store.writeAll({
+          entryId: DownloadEntry(
+            id: entryId,
+            seriesId: 'series-13',
+            episodeId: 'ep-2',
+            selectedQuality: '1080p',
+            status: DownloadStatus.completed,
+            localAssetUri: rootManifest.uri.toString(),
+            storageDirectoryPath: packageDir.path,
+            createdAt: DateTime(2026, 4, 6),
+            completedAt: DateTime(2026, 4, 7),
+          ).toJson(),
+        });
 
         final entries = await repository.getDownloads();
         final normalized = entries.single;

@@ -51,7 +51,8 @@ class DownloadsScreen extends ConsumerWidget {
           error: (error, stackTrace) => _DownloadsState(
             icon: Icons.error_outline_rounded,
             title: 'Downloads unavailable',
-            message: 'Offline downloads could not be loaded right now.\n$error',
+            message:
+                'Offline downloads could not be loaded right now. Pull to refresh or retry.',
             action: FilledButton.icon(
               onPressed: refreshDownloads,
               icon: Icon(Icons.refresh_rounded),
@@ -230,10 +231,10 @@ class _DownloadCard extends ConsumerWidget {
       loading: () => _DownloadCardScaffold(
         entry: entry,
         isBusy: actionState.isLoading,
-        seriesTitle: entry.seriesId,
+        seriesTitle: entry.displaySeriesTitle,
         posterUrl: null,
-        episodeLabel: 'Episode ${entry.episodeId}',
-        episodeTitle: entry.selectedQuality,
+        episodeLabel: entry.displayEpisodeLabel,
+        episodeTitle: entry.displayEpisodeTitle,
         onOpenSeries: () =>
             context.push(AppRoutePaths.seriesDetails(entry.seriesId)),
         onPlayOffline: entry.isPlayableOffline
@@ -241,10 +242,10 @@ class _DownloadCard extends ConsumerWidget {
                 AppRoutePaths.player,
                 extra: PlayerScreenContext(
                   seriesId: entry.seriesId,
-                  seriesTitle: entry.seriesId,
+                  seriesTitle: entry.displaySeriesTitle,
                   episodeId: entry.episodeId,
-                  episodeNumberLabel: entry.episodeId,
-                  episodeTitle: 'Episode ${entry.episodeId}',
+                  episodeNumberLabel: entry.displayEpisodeNumberLabel,
+                  episodeTitle: entry.displayEpisodeTitle,
                 ),
               )
             : null,
@@ -252,10 +253,10 @@ class _DownloadCard extends ConsumerWidget {
       error: (error, stackTrace) => _DownloadCardScaffold(
         entry: entry,
         isBusy: actionState.isLoading,
-        seriesTitle: entry.seriesId,
+        seriesTitle: entry.displaySeriesTitle,
         posterUrl: null,
-        episodeLabel: 'Episode ${entry.episodeId}',
-        episodeTitle: entry.selectedQuality,
+        episodeLabel: entry.displayEpisodeLabel,
+        episodeTitle: entry.displayEpisodeTitle,
         onOpenSeries: () =>
             context.push(AppRoutePaths.seriesDetails(entry.seriesId)),
         onPlayOffline: entry.isPlayableOffline
@@ -263,10 +264,10 @@ class _DownloadCard extends ConsumerWidget {
                 AppRoutePaths.player,
                 extra: PlayerScreenContext(
                   seriesId: entry.seriesId,
-                  seriesTitle: entry.seriesId,
+                  seriesTitle: entry.displaySeriesTitle,
                   episodeId: entry.episodeId,
-                  episodeNumberLabel: entry.episodeId,
-                  episodeTitle: 'Episode ${entry.episodeId}',
+                  episodeNumberLabel: entry.displayEpisodeNumberLabel,
+                  episodeTitle: entry.displayEpisodeTitle,
                 ),
               )
             : null,
@@ -343,7 +344,12 @@ class _DownloadCardScaffold extends ConsumerWidget {
     }
 
     Future<void> handleRetry() async {
-      await controller.startDownload(selectedQuality: entry.selectedQuality);
+      await controller.startDownload(
+        selectedQuality: entry.selectedQuality,
+        seriesTitle: entry.seriesTitle,
+        episodeNumberLabel: entry.episodeNumberLabel,
+        episodeTitle: entry.episodeTitle,
+      );
     }
 
     final integrityFailure = entry.requiresOfflineRestore;

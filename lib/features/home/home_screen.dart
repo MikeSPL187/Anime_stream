@@ -84,22 +84,27 @@ class _HomeLaunchSurface extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
           if (!hideContinueWatching) ...[
-            _ContinueWatchingSection(continueWatching: continueWatching),
+            _ContinueWatchingSection(
+              continueWatching: continueWatching,
+              onRetry: onRefresh,
+            ),
             const SizedBox(height: 24),
           ],
           if (homeDiscovery.isLoading && discoveryData == null)
             const _SectionLoadingState(title: 'Latest Spotlight')
           else if (homeDiscovery.hasError && discoveryData == null)
-            const _SectionErrorState(
+            _SectionErrorState(
               title: 'Latest Spotlight',
               message: 'Home discovery could not be loaded right now.',
+              action: _RetrySectionAction(onPressed: onRefresh),
             )
           else if (latestReleases.isNotEmpty)
             _LatestSpotlightHero(series: latestReleases.first)
           else if ((discoveryData?.latestError ?? '').trim().isNotEmpty)
-            const _SectionErrorState(
+            _SectionErrorState(
               title: 'Latest Spotlight',
               message: 'Latest releases could not be loaded right now.',
+              action: _RetrySectionAction(onPressed: onRefresh),
             )
           else
             const _InlineEmptyState(
@@ -111,6 +116,7 @@ class _HomeLaunchSurface extends StatelessWidget {
           _DiscoverySection(
             latestReleases: latestReleases.skip(1).toList(growable: false),
             homeDiscovery: homeDiscovery,
+            onRetry: onRefresh,
           ),
         ],
       ),
@@ -119,9 +125,13 @@ class _HomeLaunchSurface extends StatelessWidget {
 }
 
 class _ContinueWatchingSection extends StatelessWidget {
-  const _ContinueWatchingSection({required this.continueWatching});
+  const _ContinueWatchingSection({
+    required this.continueWatching,
+    required this.onRetry,
+  });
 
   final AsyncValue<List<HomeContinueWatchingItem>> continueWatching;
+  final RefreshCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +139,9 @@ class _ContinueWatchingSection extends StatelessWidget {
       loading: () => const _SectionLoadingState(title: 'Continue Watching'),
       error: (error, stackTrace) => _SectionErrorState(
         title: 'Continue Watching',
-        message: 'Saved watch progress could not be loaded.\n$error',
+        message:
+            'Saved watch progress could not be loaded right now. Pull to refresh to retry.',
+        action: _RetrySectionAction(onPressed: onRetry),
       ),
       data: (entries) {
         if (entries.isEmpty) {
@@ -394,7 +406,7 @@ class _LatestSpotlightHero extends StatelessWidget {
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
                             ),
-                            child: const Text('Browse latest'),
+                            child: const Text('Open Browse'),
                           ),
                         ],
                       ),
@@ -414,10 +426,12 @@ class _DiscoverySection extends StatelessWidget {
   const _DiscoverySection({
     required this.latestReleases,
     required this.homeDiscovery,
+    required this.onRetry,
   });
 
   final List<Series> latestReleases;
   final AsyncValue<HomeDiscoveryData> homeDiscovery;
+  final RefreshCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -428,9 +442,10 @@ class _DiscoverySection extends StatelessWidget {
     }
 
     if (homeDiscovery.hasError && discoveryData == null) {
-      return const _SectionErrorState(
+      return _SectionErrorState(
         title: 'Discover',
         message: 'Home discovery slices could not be loaded right now.',
+        action: _RetrySectionAction(onPressed: onRetry),
       );
     }
 
@@ -648,10 +663,15 @@ class _SectionLoadingState extends StatelessWidget {
 }
 
 class _SectionErrorState extends StatelessWidget {
-  const _SectionErrorState({required this.title, required this.message});
+  const _SectionErrorState({
+    required this.title,
+    required this.message,
+    this.action,
+  });
 
   final String title;
   final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -660,17 +680,26 @@ class _SectionErrorState extends StatelessWidget {
       children: [
         _SectionHeader(title: title),
         const SizedBox(height: 10),
-        _InlineEmptyState(title: 'Unavailable', message: message),
+        _InlineEmptyState(
+          title: 'Unavailable',
+          message: message,
+          action: action,
+        ),
       ],
     );
   }
 }
 
 class _InlineEmptyState extends StatelessWidget {
-  const _InlineEmptyState({required this.title, required this.message});
+  const _InlineEmptyState({
+    required this.title,
+    required this.message,
+    this.action,
+  });
 
   final String title;
   final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -694,9 +723,25 @@ class _InlineEmptyState extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            if (action != null) ...[const SizedBox(height: 14), action!],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RetrySectionAction extends StatelessWidget {
+  const _RetrySectionAction({required this.onPressed});
+
+  final RefreshCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.refresh_rounded),
+      label: const Text('Retry'),
     );
   }
 }

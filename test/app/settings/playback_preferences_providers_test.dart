@@ -13,6 +13,7 @@ void main() {
         preferences: const PlaybackPreferences(
           autoplayNextEpisode: false,
           defaultPlaybackSpeed: 1.25,
+          defaultDownloadQuality: '720p',
         ),
       );
       final container = ProviderContainer(
@@ -26,38 +27,51 @@ void main() {
 
       expect(preferences.autoplayNextEpisode, isFalse);
       expect(preferences.defaultPlaybackSpeed, 1.25);
+      expect(preferences.defaultDownloadQuality, '720p');
     });
 
-    test('persists autoplay and playback speed updates', () async {
-      final repository = _FakePlaybackRepository(
-        preferences: const PlaybackPreferences(),
-      );
-      final container = ProviderContainer(
-        overrides: [playbackRepositoryProvider.overrideWithValue(repository)],
-      );
-      addTearDown(container.dispose);
+    test(
+      'persists autoplay, playback speed, and download quality updates',
+      () async {
+        final repository = _FakePlaybackRepository(
+          preferences: const PlaybackPreferences(),
+        );
+        final container = ProviderContainer(
+          overrides: [playbackRepositoryProvider.overrideWithValue(repository)],
+        );
+        addTearDown(container.dispose);
 
-      await container.read(playbackPreferencesControllerProvider.future);
+        await container.read(playbackPreferencesControllerProvider.future);
 
-      await container
-          .read(playbackPreferencesControllerProvider.notifier)
-          .setAutoplayNextEpisode(false);
-      await container
-          .read(playbackPreferencesControllerProvider.notifier)
-          .setDefaultPlaybackSpeed(1.5);
+        await container
+            .read(playbackPreferencesControllerProvider.notifier)
+            .setAutoplayNextEpisode(false);
+        await container
+            .read(playbackPreferencesControllerProvider.notifier)
+            .setDefaultPlaybackSpeed(1.5);
+        await container
+            .read(playbackPreferencesControllerProvider.notifier)
+            .setDefaultDownloadQuality('720p');
 
-      final preferences = container.read(playbackPreferencesProvider);
+        final preferences = container.read(playbackPreferencesProvider);
 
-      expect(preferences.autoplayNextEpisode, isFalse);
-      expect(preferences.defaultPlaybackSpeed, 1.5);
-      expect(repository.savedPreferences, [
-        const PlaybackPreferences(autoplayNextEpisode: false),
-        const PlaybackPreferences(
-          autoplayNextEpisode: false,
-          defaultPlaybackSpeed: 1.5,
-        ),
-      ]);
-    });
+        expect(preferences.autoplayNextEpisode, isFalse);
+        expect(preferences.defaultPlaybackSpeed, 1.5);
+        expect(preferences.defaultDownloadQuality, '720p');
+        expect(repository.savedPreferences, [
+          const PlaybackPreferences(autoplayNextEpisode: false),
+          const PlaybackPreferences(
+            autoplayNextEpisode: false,
+            defaultPlaybackSpeed: 1.5,
+          ),
+          const PlaybackPreferences(
+            autoplayNextEpisode: false,
+            defaultPlaybackSpeed: 1.5,
+            defaultDownloadQuality: '720p',
+          ),
+        ]);
+      },
+    );
   });
 }
 

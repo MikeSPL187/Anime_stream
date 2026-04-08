@@ -17,7 +17,12 @@ class LocalPlaybackRepository implements PlaybackRepository {
     }
 
     try {
-      return PlaybackPreferences.fromJson(payload);
+      final preferences = PlaybackPreferences.fromJson(payload);
+      return preferences.copyWith(
+        defaultDownloadQuality: normalizeDownloadQualityLabel(
+          preferences.defaultDownloadQuality,
+        ),
+      );
     } on FormatException {
       return const PlaybackPreferences();
     } on TypeError {

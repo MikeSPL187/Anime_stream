@@ -31,6 +31,14 @@ class PlaybackPreferencesController extends AsyncNotifier<PlaybackPreferences> {
     await _persist(updated, fallback: current);
   }
 
+  Future<void> setDefaultDownloadQuality(String qualityLabel) async {
+    final current = state.valueOrNull ?? const PlaybackPreferences();
+    final updated = current.copyWith(
+      defaultDownloadQuality: normalizeDownloadQualityLabel(qualityLabel),
+    );
+    await _persist(updated, fallback: current);
+  }
+
   Future<void> _persist(
     PlaybackPreferences updated, {
     required PlaybackPreferences fallback,

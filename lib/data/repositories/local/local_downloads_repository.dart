@@ -68,6 +68,9 @@ class LocalDownloadsRepository implements DownloadsRepository {
     required String seriesId,
     required String episodeId,
     String selectedQuality = '1080p',
+    String? seriesTitle,
+    String? episodeNumberLabel,
+    String? episodeTitle,
   }) async {
     Directory? assetDirectory;
     final baseEntry = DownloadEntry(
@@ -80,6 +83,9 @@ class LocalDownloadsRepository implements DownloadsRepository {
       episodeId: episodeId,
       selectedQuality: selectedQuality,
       status: DownloadStatus.downloading,
+      seriesTitle: seriesTitle,
+      episodeNumberLabel: episodeNumberLabel,
+      episodeTitle: episodeTitle,
       createdAt: DateTime.now(),
       sourceKind: DownloadSourceKind.localHlsManifest,
     );
@@ -127,6 +133,9 @@ class LocalDownloadsRepository implements DownloadsRepository {
         episodeId: episodeId,
         selectedQuality: resolvedStream.qualityLabel,
         status: DownloadStatus.completed,
+        seriesTitle: seriesTitle,
+        episodeNumberLabel: episodeNumberLabel,
+        episodeTitle: episodeTitle,
         bytesDownloaded: packagedAsset.bytesDownloaded,
         totalBytes: packagedAsset.bytesDownloaded,
         localAssetUri: packagedAsset.localManifestUri.toString(),
@@ -185,72 +194,98 @@ class LocalDownloadsRepository implements DownloadsRepository {
     required String playlistUrl,
     required Directory assetDirectory,
   }) async {
-    final playlistUri = Uri.parse(playlistUrl);
-    final playlistResponse = await _dio.get<String>(
-      playlistUrl,
-      options: Options(responseType: ResponseType.plain),
+    return _packageHlsManifest(
+      manifestUri: Uri.parse(playlistUrl),
+      assetDirectory: assetDirectory,
+      localFileName: 'index.m3u8',
+      packagingState: _OfflineManifestPackagingState(),
+      activeManifestUris: <String>{},
     );
-    final playlistBody = playlistResponse.data;
-    if (playlistBody == null || playlistBody.trim().isEmpty) {
+  }
+
+  Future<_PackagedHlsAsset> _packageHlsManifest({
+    required Uri manifestUri,
+    required Directory assetDirectory,
+    required String localFileName,
+    required _OfflineManifestPackagingState packagingState,
+    required Set<String> activeManifestUris,
+  }) async {
+    final manifestKey = manifestUri.toString();
+    if (!activeManifestUris.add(manifestKey)) {
       throw const EpisodeDownloadExecutionException(
-        'The HLS playlist could not be downloaded.',
+        'The HLS playlist contains a manifest loop.',
       );
     }
 
-    var bytesDownloaded = 0;
-    var assetIndex = 0;
-    final rewrittenLines = <String>[];
-
-    for (final rawLine in playlistBody.split('\n')) {
-      final trimmedLine = rawLine.trim();
-      if (trimmedLine.isEmpty) {
-        rewrittenLines.add(rawLine);
-        continue;
-      }
-
-      if (!trimmedLine.startsWith('#')) {
-        final packagedAsset = await _downloadAssetReference(
-          reference: trimmedLine,
-          baseUri: playlistUri,
-          assetDirectory: assetDirectory,
-          assetIndex: assetIndex,
+    try {
+      final playlistResponse = await _dio.get<String>(
+        manifestUri.toString(),
+        options: Options(responseType: ResponseType.plain),
+      );
+      final playlistBody = playlistResponse.data;
+      if (playlistBody == null || playlistBody.trim().isEmpty) {
+        throw const EpisodeDownloadExecutionException(
+          'The HLS playlist could not be downloaded.',
         );
-        assetIndex += 1;
-        bytesDownloaded += packagedAsset.bytesDownloaded;
-        rewrittenLines.add(packagedAsset.rewrittenLine);
-        continue;
       }
 
-      final rewrittenTag = await _rewriteTaggedUriLine(
-        rawLine: rawLine,
-        baseUri: playlistUri,
-        assetDirectory: assetDirectory,
-        assetIndex: assetIndex,
+      var bytesDownloaded = 0;
+      final rewrittenLines = <String>[];
+
+      for (final rawLine in playlistBody.split('\n')) {
+        final trimmedLine = rawLine.trim();
+        if (trimmedLine.isEmpty) {
+          rewrittenLines.add(rawLine);
+          continue;
+        }
+
+        if (!trimmedLine.startsWith('#')) {
+          final packagedAsset = await _packageResolvedReference(
+            reference: trimmedLine,
+            baseUri: manifestUri,
+            assetDirectory: assetDirectory,
+            packagingState: packagingState,
+            activeManifestUris: activeManifestUris,
+          );
+          bytesDownloaded += packagedAsset.bytesDownloaded;
+          rewrittenLines.add(packagedAsset.rewrittenLine);
+          continue;
+        }
+
+        final rewrittenTag = await _rewriteTaggedUriLine(
+          rawLine: rawLine,
+          baseUri: manifestUri,
+          assetDirectory: assetDirectory,
+          packagingState: packagingState,
+          activeManifestUris: activeManifestUris,
+        );
+        if (rewrittenTag == null) {
+          rewrittenLines.add(rawLine);
+          continue;
+        }
+
+        bytesDownloaded += rewrittenTag.bytesDownloaded;
+        rewrittenLines.add(rewrittenTag.rewrittenLine);
+      }
+
+      final localManifestFile = File('${assetDirectory.path}/$localFileName');
+      await localManifestFile.writeAsString(rewrittenLines.join('\n'));
+
+      return _PackagedHlsAsset(
+        localManifestUri: Uri.file(localManifestFile.path),
+        bytesDownloaded: bytesDownloaded,
       );
-      if (rewrittenTag == null) {
-        rewrittenLines.add(rawLine);
-        continue;
-      }
-
-      assetIndex += 1;
-      bytesDownloaded += rewrittenTag.bytesDownloaded;
-      rewrittenLines.add(rewrittenTag.rewrittenLine);
+    } finally {
+      activeManifestUris.remove(manifestKey);
     }
-
-    final localManifestFile = File('${assetDirectory.path}/index.m3u8');
-    await localManifestFile.writeAsString(rewrittenLines.join('\n'));
-
-    return _PackagedHlsAsset(
-      localManifestUri: Uri.file(localManifestFile.path),
-      bytesDownloaded: bytesDownloaded,
-    );
   }
 
   Future<_PackagedAssetReference?> _rewriteTaggedUriLine({
     required String rawLine,
     required Uri baseUri,
     required Directory assetDirectory,
-    required int assetIndex,
+    required _OfflineManifestPackagingState packagingState,
+    required Set<String> activeManifestUris,
   }) async {
     final uriMatch = RegExp(r'URI="([^"]+)"').firstMatch(rawLine);
     if (uriMatch == null) {
@@ -262,11 +297,12 @@ class LocalDownloadsRepository implements DownloadsRepository {
       return null;
     }
 
-    final packagedAsset = await _downloadAssetReference(
+    final packagedAsset = await _packageResolvedReference(
       reference: reference,
       baseUri: baseUri,
       assetDirectory: assetDirectory,
-      assetIndex: assetIndex,
+      packagingState: packagingState,
+      activeManifestUris: activeManifestUris,
     );
 
     final rewrittenLine = rawLine.replaceFirst(
@@ -280,13 +316,45 @@ class LocalDownloadsRepository implements DownloadsRepository {
     );
   }
 
-  Future<_PackagedAssetReference> _downloadAssetReference({
+  Future<_PackagedAssetReference> _packageResolvedReference({
     required String reference,
     required Uri baseUri,
     required Directory assetDirectory,
-    required int assetIndex,
+    required _OfflineManifestPackagingState packagingState,
+    required Set<String> activeManifestUris,
   }) async {
     final assetUri = baseUri.resolve(reference);
+    if (_isHlsManifestUri(assetUri)) {
+      final localFileName = packagingState.nextLocalFileName('.m3u8');
+      final packagedManifest = await _packageHlsManifest(
+        manifestUri: assetUri,
+        assetDirectory: assetDirectory,
+        localFileName: localFileName,
+        packagingState: packagingState,
+        activeManifestUris: activeManifestUris,
+      );
+      return _PackagedAssetReference(
+        rewrittenLine: localFileName,
+        bytesDownloaded: packagedManifest.bytesDownloaded,
+      );
+    }
+
+    return _downloadResolvedAssetReference(
+      reference: reference,
+      assetUri: assetUri,
+      assetDirectory: assetDirectory,
+      localFileName: packagingState.nextLocalFileName(
+        _resolveFileExtension(assetUri.path),
+      ),
+    );
+  }
+
+  Future<_PackagedAssetReference> _downloadResolvedAssetReference({
+    required String reference,
+    required Uri assetUri,
+    required Directory assetDirectory,
+    required String localFileName,
+  }) async {
     final assetResponse = await _dio.get<List<int>>(
       assetUri.toString(),
       options: Options(responseType: ResponseType.bytes),
@@ -298,9 +366,6 @@ class LocalDownloadsRepository implements DownloadsRepository {
       );
     }
 
-    final extension = _resolveFileExtension(assetUri.path);
-    final localFileName =
-        'asset_${assetIndex.toString().padLeft(4, '0')}$extension';
     final localFile = File('${assetDirectory.path}/$localFileName');
     await localFile.writeAsBytes(assetBytes);
 
@@ -308,6 +373,10 @@ class LocalDownloadsRepository implements DownloadsRepository {
       rewrittenLine: localFileName,
       bytesDownloaded: assetBytes.length,
     );
+  }
+
+  bool _isHlsManifestUri(Uri uri) {
+    return uri.path.toLowerCase().endsWith('.m3u8');
   }
 
   String _resolveFileExtension(String path) {
@@ -583,7 +652,14 @@ class LocalDownloadsRepository implements DownloadsRepository {
   Future<_OfflinePackageValidationFailure?> _validatePackagedHlsManifest({
     required File manifestFile,
     required Directory assetDirectory,
+    Set<String>? validatedManifestPaths,
   }) async {
+    final manifestKey = _normalizePath(manifestFile.path);
+    final visitedManifests = validatedManifestPaths ?? <String>{};
+    if (!visitedManifests.add(manifestKey)) {
+      return null;
+    }
+
     final manifestBody = await _readOfflineManifest(manifestFile);
     if (manifestBody == null) {
       return const _OfflinePackageValidationFailure(
@@ -625,6 +701,20 @@ class LocalDownloadsRepository implements DownloadsRepository {
       if (validationFailure != null) {
         return validationFailure;
       }
+
+      if (_isOfflineManifestReference(reference)) {
+        final nestedManifest = File.fromUri(
+          assetDirectory.uri.resolve(reference.trim()),
+        );
+        final nestedValidationFailure = await _validatePackagedHlsManifest(
+          manifestFile: nestedManifest,
+          assetDirectory: assetDirectory,
+          validatedManifestPaths: visitedManifests,
+        );
+        if (nestedValidationFailure != null) {
+          return nestedValidationFailure;
+        }
+      }
     }
 
     return null;
@@ -645,6 +735,10 @@ class LocalDownloadsRepository implements DownloadsRepository {
       return null;
     }
     return reference;
+  }
+
+  bool _isOfflineManifestReference(String reference) {
+    return reference.trim().toLowerCase().endsWith('.m3u8');
   }
 
   Future<_OfflinePackageValidationFailure?> _validatePackagedAssetReference({
@@ -797,6 +891,17 @@ class _ResolvedStreamCandidate {
 
   final String qualityLabel;
   final String streamUri;
+}
+
+class _OfflineManifestPackagingState {
+  int _assetIndex = 0;
+
+  String nextLocalFileName(String extension) {
+    final localFileName =
+        'asset_${_assetIndex.toString().padLeft(4, '0')}$extension';
+    _assetIndex += 1;
+    return localFileName;
+  }
 }
 
 class _PackagedHlsAsset {

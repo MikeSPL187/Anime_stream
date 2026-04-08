@@ -6,6 +6,7 @@ import '../../app/history/history_providers.dart';
 import '../../app/router/app_router.dart';
 import '../../domain/models/history_entry.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
+import '../player/player_screen_context.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -35,7 +36,8 @@ class HistoryScreen extends ConsumerWidget {
           error: (error, stackTrace) => _CenteredState(
             icon: Icons.error_outline_rounded,
             title: 'History unavailable',
-            message: 'Watch history could not be loaded.\n$error',
+            message:
+                'Watch history could not be loaded right now. Pull to refresh or retry.',
             action: FilledButton.icon(
               onPressed: refreshHistory,
               icon: Icon(Icons.refresh_rounded),
@@ -113,6 +115,13 @@ class _HistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final episodeTitle = _resolvedEpisodeTitle(entry);
+    final playerContext = PlayerScreenContext(
+      seriesId: entry.series.id,
+      seriesTitle: entry.series.title,
+      episodeId: entry.episode.id,
+      episodeNumberLabel: entry.episode.numberLabel,
+      episodeTitle: episodeTitle,
+    );
     final metadata = <String>[
       'Episode ${entry.episode.numberLabel}',
       if (entry.series.releaseYear != null) '${entry.series.releaseYear}',
@@ -124,7 +133,7 @@ class _HistoryRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
+        onTap: () => context.push(AppRoutePaths.player, extra: playerContext),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -166,9 +175,26 @@ class _HistoryRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
+            Column(
+              children: [
+                IconButton(
+                  onPressed: () => context.push(
+                    AppRoutePaths.seriesDetails(entry.series.id),
+                  ),
+                  tooltip: 'Open series',
+                  icon: Icon(
+                    Icons.menu_book_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  'Replay',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

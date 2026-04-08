@@ -77,6 +77,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  void _retrySearch() {
+    final submittedQuery = _submittedQuery;
+    if (submittedQuery == null) {
+      return;
+    }
+
+    ref.invalidate(searchSeriesProvider(submittedQuery));
+  }
+
   @override
   Widget build(BuildContext context) {
     final submittedQuery = _submittedQuery;
@@ -101,6 +110,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: _SearchBody(
               draftQuery: _draftQuery,
               searchResults: searchResults,
+              onRetryRequested: _retrySearch,
             ),
           ),
         ],
@@ -148,10 +158,15 @@ class _SearchField extends StatelessWidget {
 }
 
 class _SearchBody extends StatelessWidget {
-  const _SearchBody({required this.draftQuery, required this.searchResults});
+  const _SearchBody({
+    required this.draftQuery,
+    required this.searchResults,
+    required this.onRetryRequested,
+  });
 
   final String draftQuery;
   final AsyncValue<List<Series>>? searchResults;
+  final VoidCallback onRetryRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +201,13 @@ class _SearchBody extends StatelessWidget {
       error: (error, stackTrace) => _SearchState(
         icon: Icons.error_outline_rounded,
         title: 'Search unavailable',
-        message: 'The catalog could not be searched right now.\n$error',
+        message:
+            'The catalog could not be searched right now. Try again in a moment.',
+        action: FilledButton.icon(
+          onPressed: onRetryRequested,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Retry'),
+        ),
       ),
       data: (seriesList) {
         if (seriesList.isEmpty) {

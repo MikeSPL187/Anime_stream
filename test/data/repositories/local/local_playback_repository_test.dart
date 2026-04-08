@@ -49,6 +49,7 @@ void main() {
       const savedPreferences = PlaybackPreferences(
         autoplayNextEpisode: false,
         defaultPlaybackSpeed: 1.25,
+        defaultDownloadQuality: '720p',
       );
 
       await repository.savePlaybackPreferences(savedPreferences);

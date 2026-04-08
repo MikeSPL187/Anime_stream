@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/episode_progress.dart';
+import '../../shared/user_facing_async_error.dart';
 import '../di/series_repository_provider.dart';
 import '../di/watch_system_repository_provider.dart';
 import 'series_details_data.dart';
@@ -28,7 +29,11 @@ final seriesDetailsProvider = FutureProvider.autoDispose
               seriesId: seriesId,
             ),
           ).catchError((Object error, StackTrace stackTrace) {
-            watchStateErrorMessage ??= error.toString();
+            watchStateErrorMessage ??= userFacingAsyncErrorMessage(
+              error,
+              fallbackMessage:
+                  'Resume progress and watched markers could not be loaded right now.',
+            );
             return <EpisodeProgress>[];
           });
 

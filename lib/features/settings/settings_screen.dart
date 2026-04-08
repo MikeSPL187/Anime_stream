@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/player/player_playback_speed.dart';
 import '../../app/router/app_router.dart';
 import '../../app/settings/playback_preferences_providers.dart';
+import '../../domain/models/playback_preferences.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -194,6 +195,20 @@ class _PlaybackPreferencesSection extends ConsumerWidget {
                   .setDefaultPlaybackSpeed(rate),
             ),
           ),
+          const Divider(height: 28),
+          _TextChoicePreferenceRow(
+            icon: Icons.download_for_offline_rounded,
+            title: 'Default download quality',
+            subtitle:
+                'Preselected when you save an episode for offline playback. You can still override it per episode.',
+            selectedValue: preferences.defaultDownloadQuality,
+            options: supportedDownloadQualityLabels,
+            onSelected: (qualityLabel) => savePreference(
+              () => ref
+                  .read(playbackPreferencesControllerProvider.notifier)
+                  .setDefaultDownloadQuality(qualityLabel),
+            ),
+          ),
         ],
       ),
     );
@@ -380,6 +395,66 @@ class _ChoicePreferenceRow extends StatelessWidget {
                       label: Text(formatPlayerPlaybackRateLabel(rate)),
                       selected: (normalizedRate - rate).abs() < 0.001,
                       onSelected: (_) => onSelected(rate),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TextChoicePreferenceRow extends StatelessWidget {
+  const _TextChoicePreferenceRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selectedValue,
+    required this.options,
+    required this.onSelected,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String selectedValue;
+  final List<String> options;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final normalizedValue = normalizeDownloadQualityLabel(selectedValue);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _IconTile(icon: icon),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final option in options)
+                    ChoiceChip(
+                      label: Text(option),
+                      selected: option == normalizedValue,
+                      onSelected: (_) => onSelected(option),
                     ),
                 ],
               ),

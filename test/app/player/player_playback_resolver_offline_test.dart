@@ -2,12 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:anime_stream_app/app/player/player_playback_providers.dart';
 import 'package:anime_stream_app/app/player/player_playback_source.dart';
-import 'package:anime_stream_app/data/adapters/anilibria/anilibria_remote_data_source.dart';
-import 'package:anime_stream_app/data/dto/anilibria/anilibria_episode_dto.dart';
-import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_dto.dart';
-import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_page_dto.dart';
 import 'package:anime_stream_app/domain/models/download_entry.dart';
+import 'package:anime_stream_app/domain/models/episode_playback_variant.dart';
+import 'package:anime_stream_app/domain/models/episode_selector.dart';
 import 'package:anime_stream_app/domain/repositories/downloads_repository.dart';
+import 'package:anime_stream_app/domain/repositories/episode_playback_repository.dart';
 import 'package:anime_stream_app/features/player/player_screen_context.dart';
 
 void main() {
@@ -16,7 +15,7 @@ void main() {
       'prefers completed offline asset before remote AniLibria HLS resolution',
       () async {
         final resolver = PlayerPlaybackResolver(
-          remoteDataSource: _FailingRemoteDataSource(),
+          episodePlaybackRepository: _FailingEpisodePlaybackRepository(),
           downloadsRepository: _FakeDownloadsRepository(
             playableEntry: const DownloadEntry(
               id: 'series-4::episode-2::1080p',
@@ -54,7 +53,7 @@ void main() {
       'falls back to remote HLS resolution when no local asset exists',
       () async {
         final resolver = PlayerPlaybackResolver(
-          remoteDataSource: _FakeRemoteDataSource(),
+          episodePlaybackRepository: _FakeEpisodePlaybackRepository(),
           downloadsRepository: const _FakeDownloadsRepository(
             playableEntry: null,
           ),
@@ -110,6 +109,9 @@ class _FakeDownloadsRepository implements DownloadsRepository {
     required String seriesId,
     required String episodeId,
     String selectedQuality = '1080p',
+    String? seriesTitle,
+    String? episodeNumberLabel,
+    String? episodeTitle,
   }) async {
     throw UnimplementedError();
   }
@@ -118,112 +120,29 @@ class _FakeDownloadsRepository implements DownloadsRepository {
   Future<void> removeDownload(String downloadId) async {}
 }
 
-class _FailingRemoteDataSource implements AnilibriaRemoteDataSource {
+class _FailingEpisodePlaybackRepository implements EpisodePlaybackRepository {
   @override
-  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<AnilibriaReleasePageDto> fetchCatalogPage({
-    int page = 1,
-    int limit = 20,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchPopularReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) {
+  Future<List<EpisodePlaybackVariant>> getRemotePlaybackVariants({
+    required String seriesId,
+    required EpisodeSelector episodeSelector,
+  }) async {
     throw StateError(
       'Remote resolution should not be used when offline asset exists.',
     );
   }
-
-  @override
-  Future<List<AnilibriaEpisodeDto>> fetchReleaseEpisodes(String releaseId) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchSimulcastReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> searchReleases(
-    String query, {
-    int limit = 20,
-  }) {
-    throw UnimplementedError();
-  }
 }
 
-class _FakeRemoteDataSource implements AnilibriaRemoteDataSource {
+class _FakeEpisodePlaybackRepository implements EpisodePlaybackRepository {
   @override
-  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<AnilibriaReleasePageDto> fetchCatalogPage({
-    int page = 1,
-    int limit = 20,
+  Future<List<EpisodePlaybackVariant>> getRemotePlaybackVariants({
+    required String seriesId,
+    required EpisodeSelector episodeSelector,
   }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchPopularReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) async {
-    return const AnilibriaReleaseDto(
-      id: 'series-5',
-      episodes: [
-        AnilibriaEpisodeDto(
-          id: 'episode-3',
-          releaseId: 'series-5',
-          ordinal: 3,
-          numberLabel: '3',
-          title: 'Killing Magic',
-          hls720Url: 'https://cdn.example.com/frieren/episode-3.m3u8',
-        ),
-      ],
-    );
-  }
-
-  @override
-  Future<List<AnilibriaEpisodeDto>> fetchReleaseEpisodes(String releaseId) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchSimulcastReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> searchReleases(
-    String query, {
-    int limit = 20,
-  }) {
-    throw UnimplementedError();
+    return Future.value(const [
+      EpisodePlaybackVariant(
+        sourceUri: 'https://cdn.example.com/frieren/episode-3.m3u8',
+        qualityLabel: '720p',
+      ),
+    ]);
   }
 }

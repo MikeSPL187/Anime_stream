@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,6 +19,9 @@ import 'app_shell.dart';
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutePaths.home,
+    errorBuilder: (context, state) {
+      return _UnknownRouteScreen(attemptedPath: state.uri.path);
+    },
     routes: [
       ShellRoute(
         builder: (context, state, child) {
@@ -85,6 +89,75 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _UnknownRouteScreen extends StatelessWidget {
+  const _UnknownRouteScreen({required this.attemptedPath});
+
+  final String attemptedPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final trimmedPath = attemptedPath.trim();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Route unavailable')),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.explore_off_rounded,
+                    size: 36,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'This screen is unavailable',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'The requested route could not be opened. Return to Home and continue from a valid entry point.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (trimmedPath.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      trimmedPath,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: () => context.go(AppRoutePaths.home),
+                    icon: const Icon(Icons.home_rounded),
+                    label: const Text('Open Home'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 abstract final class AppRoutePaths {
   static const home = '/';

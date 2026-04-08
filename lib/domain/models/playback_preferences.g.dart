@@ -23,6 +23,8 @@ _$PlaybackPreferencesImpl _$$PlaybackPreferencesImplFromJson(
   preferSubtitles: json['preferSubtitles'] as bool? ?? false,
   defaultPlaybackSpeed:
       (json['defaultPlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
+  defaultDownloadQuality:
+      json['defaultDownloadQuality'] as String? ?? '1080p',
 );
 
 Map<String, dynamic> _$$PlaybackPreferencesImplToJson(
@@ -33,4 +35,5 @@ Map<String, dynamic> _$$PlaybackPreferencesImplToJson(
   'autoplayNextEpisode': instance.autoplayNextEpisode,
   'preferSubtitles': instance.preferSubtitles,
   'defaultPlaybackSpeed': instance.defaultPlaybackSpeed,
+  'defaultDownloadQuality': instance.defaultDownloadQuality,
 };

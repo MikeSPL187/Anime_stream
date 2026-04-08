@@ -46,7 +46,10 @@ void main() {
         final discovery = await container.read(homeDiscoveryProvider.future);
 
         expect(discovery.latestReleases, isEmpty);
-        expect(discovery.latestError, contains('Latest releases unavailable'));
+        expect(
+          discovery.latestError,
+          'This discovery section could not be loaded right now.',
+        );
         expect(discovery.trendingSeries.map((series) => series.id), [
           'trending-1',
         ]);

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/series.dart';
+import '../../shared/user_facing_async_error.dart';
 import '../di/series_repository_provider.dart';
 
 final homeDiscoveryProvider = FutureProvider.autoDispose<HomeDiscoveryData>((
@@ -40,7 +41,11 @@ Future<_HomeSliceLoadResult> _loadHomeSlice(
   } catch (error) {
     return _HomeSliceLoadResult(
       seriesList: const [],
-      errorMessage: error.toString(),
+      errorMessage: userFacingAsyncErrorMessage(
+        error,
+        fallbackMessage:
+            'This discovery section could not be loaded right now.',
+      ),
     );
   }
 }

@@ -35,10 +35,46 @@ void main() {
       expect(repository.lastSearchQuery, 'frieren');
     },
   );
+
+  testWidgets('SearchScreen retries the submitted query from the error state', (
+    tester,
+  ) async {
+    final repository = _FakeSeriesRepository(failFirstSearch: true);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [seriesRepositoryProvider.overrideWithValue(repository)],
+        child: const MaterialApp(home: SearchScreen()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), 'frieren');
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(repository.searchRequests, 1);
+    expect(find.text('Search unavailable'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(repository.searchRequests, 2);
+    expect(find.text('Top match'), findsWidgets);
+    expect(find.text('Search unavailable'), findsNothing);
+  });
 }
 
 class _FakeSeriesRepository implements SeriesRepository {
+  _FakeSeriesRepository({this.failFirstSearch = false});
+
+  final bool failFirstSearch;
   String? lastSearchQuery;
+  int searchRequests = 0;
 
   @override
   Future<List<Series>> getLatestSeries({int limit = 20}) async {
@@ -75,7 +111,11 @@ class _FakeSeriesRepository implements SeriesRepository {
 
   @override
   Future<List<Series>> searchSeries(String query, {int limit = 20}) async {
+    searchRequests += 1;
     lastSearchQuery = query;
+    if (failFirstSearch && searchRequests == 1) {
+      throw StateError('search failed');
+    }
     return const [Series(id: 'frieren', slug: 'frieren', title: 'Frieren')];
   }
 }

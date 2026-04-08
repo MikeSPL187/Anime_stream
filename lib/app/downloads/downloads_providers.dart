@@ -2,14 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/download_entry.dart';
+import '../../domain/models/episode_selector.dart';
 import '../di/downloads_repository_provider.dart';
+import '../di/episode_playback_repository_provider.dart';
 
 @immutable
 class EpisodeDownloadKey {
-  const EpisodeDownloadKey({
-    required this.seriesId,
-    required this.episodeId,
-  });
+  const EpisodeDownloadKey({required this.seriesId, required this.episodeId});
 
   final String seriesId;
   final String episodeId;
@@ -27,6 +26,31 @@ class EpisodeDownloadKey {
 
   @override
   int get hashCode => Object.hash(seriesId, episodeId);
+}
+
+@immutable
+class EpisodeDownloadQualityRequest {
+  const EpisodeDownloadQualityRequest({
+    required this.seriesId,
+    required this.episodeSelector,
+  });
+
+  final String seriesId;
+  final EpisodeSelector episodeSelector;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+
+    return other is EpisodeDownloadQualityRequest &&
+        other.seriesId == seriesId &&
+        other.episodeSelector == episodeSelector;
+  }
+
+  @override
+  int get hashCode => Object.hash(seriesId, episodeSelector);
 }
 
 final downloadsListProvider = FutureProvider.autoDispose<List<DownloadEntry>>((
@@ -65,6 +89,29 @@ final episodeDownloadEntryProvider = FutureProvider.autoDispose
       return matches.first;
     });
 
+final episodeDownloadQualityOptionsProvider = FutureProvider.autoDispose
+    .family<List<String>, EpisodeDownloadQualityRequest>((ref, request) async {
+      final variants = await ref
+          .watch(episodePlaybackRepositoryProvider)
+          .getRemotePlaybackVariants(
+            seriesId: request.seriesId,
+            episodeSelector: request.episodeSelector,
+          );
+
+      final labels = <String>{};
+      final orderedQualities = <String>[];
+      for (final variant in variants) {
+        final qualityLabel = variant.qualityLabel.trim();
+        if (qualityLabel.isEmpty || !labels.add(qualityLabel)) {
+          continue;
+        }
+
+        orderedQualities.add(qualityLabel);
+      }
+
+      return List.unmodifiable(orderedQualities);
+    });
+
 final episodeDownloadActionControllerProvider =
     AutoDisposeAsyncNotifierProviderFamily<
       EpisodeDownloadActionController,
@@ -81,13 +128,23 @@ class EpisodeDownloadActionController
     _key = key;
   }
 
-  Future<void> startDownload({String selectedQuality = '1080p'}) async {
+  Future<void> startDownload({
+    String selectedQuality = '1080p',
+    String? seriesTitle,
+    String? episodeNumberLabel,
+    String? episodeTitle,
+  }) async {
     await _runOperation(() {
-      return ref.read(downloadsRepositoryProvider).startEpisodeDownload(
-        seriesId: _key.seriesId,
-        episodeId: _key.episodeId,
-        selectedQuality: selectedQuality,
-      );
+      return ref
+          .read(downloadsRepositoryProvider)
+          .startEpisodeDownload(
+            seriesId: _key.seriesId,
+            episodeId: _key.episodeId,
+            selectedQuality: selectedQuality,
+            seriesTitle: seriesTitle,
+            episodeNumberLabel: episodeNumberLabel,
+            episodeTitle: episodeTitle,
+          );
     });
   }
 

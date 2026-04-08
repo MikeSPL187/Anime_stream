@@ -38,23 +38,22 @@ class LocalWatchlistRepository implements WatchlistRepository {
       return const WatchlistSnapshot();
     }
 
+    final hydrationResults = await Future.wait([
+      for (final storedEntry in normalizedStore.entries)
+        _hydrateWatchlistEntry(storedEntry),
+    ]);
+
     final watchlist = <WatchlistEntry>[];
     var temporarilyUnavailableCount = 0;
-    for (final storedEntry in normalizedStore.entries) {
-      try {
-        final series = await _seriesRepository.getSeriesById(
-          storedEntry.seriesId,
-        );
-        watchlist.add(
-          WatchlistEntry(series: series, addedAt: storedEntry.addedAt),
-        );
-      } on StateError {
-        normalizedStore.storedEntries.remove(storedEntry.seriesId);
-        normalizedStore.didMutateStore = true;
-        continue;
-      } catch (_) {
-        temporarilyUnavailableCount += 1;
-        continue;
+    for (final result in hydrationResults) {
+      switch (result.status) {
+        case _WatchlistHydrationStatus.loaded:
+          watchlist.add(result.entry!);
+        case _WatchlistHydrationStatus.confirmedMissing:
+          normalizedStore.storedEntries.remove(result.seriesId);
+          normalizedStore.didMutateStore = true;
+        case _WatchlistHydrationStatus.temporarilyUnavailable:
+          temporarilyUnavailableCount += 1;
       }
     }
 
@@ -146,6 +145,53 @@ class LocalWatchlistRepository implements WatchlistRepository {
 
     await _watchlistStore.writeAll(normalizedStore.storedEntries);
   }
+
+  Future<_WatchlistHydrationResult> _hydrateWatchlistEntry(
+    _StoredWatchlistEntry storedEntry,
+  ) async {
+    try {
+      final series = await _seriesRepository.getSeriesById(
+        storedEntry.seriesId,
+      );
+      return _WatchlistHydrationResult.loaded(
+        WatchlistEntry(series: series, addedAt: storedEntry.addedAt),
+      );
+    } on StateError {
+      return _WatchlistHydrationResult.confirmedMissing(storedEntry.seriesId);
+    } catch (_) {
+      return const _WatchlistHydrationResult.temporarilyUnavailable();
+    }
+  }
+}
+
+enum _WatchlistHydrationStatus {
+  loaded,
+  confirmedMissing,
+  temporarilyUnavailable,
+}
+
+class _WatchlistHydrationResult {
+  const _WatchlistHydrationResult._({
+    required this.status,
+    this.entry,
+    this.seriesId = '',
+  });
+
+  const _WatchlistHydrationResult.loaded(WatchlistEntry entry)
+    : this._(status: _WatchlistHydrationStatus.loaded, entry: entry);
+
+  const _WatchlistHydrationResult.confirmedMissing(String seriesId)
+    : this._(
+        status: _WatchlistHydrationStatus.confirmedMissing,
+        seriesId: seriesId,
+      );
+
+  const _WatchlistHydrationResult.temporarilyUnavailable()
+    : this._(status: _WatchlistHydrationStatus.temporarilyUnavailable);
+
+  final _WatchlistHydrationStatus status;
+  final WatchlistEntry? entry;
+  final String seriesId;
 }
 
 class _NormalizedWatchlistStore {

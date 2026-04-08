@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../domain/models/episode_selector.dart';
+
 @immutable
 class PlayerScreenContext {
   const PlayerScreenContext({
@@ -18,6 +20,12 @@ class PlayerScreenContext {
 
   String get episodeDisplayLabel => 'Episode $episodeNumberLabel';
 
+  EpisodeSelector get episodeSelector => EpisodeSelector(
+    episodeId: episodeId,
+    episodeNumberLabel: episodeNumberLabel,
+    episodeTitle: episodeTitle,
+  );
+
   num? get episodeOrdinal => num.tryParse(episodeNumberLabel.trim());
 
   bool matchesEpisode({
@@ -25,22 +33,11 @@ class PlayerScreenContext {
     required String numberLabel,
     required String title,
   }) {
-    if (id == episodeId) {
-      return true;
-    }
-
-    final normalizedNumberLabel = numberLabel.trim();
-    if (normalizedNumberLabel == episodeNumberLabel.trim()) {
-      return true;
-    }
-
-    final selectedOrdinal = episodeOrdinal;
-    if (selectedOrdinal != null &&
-        num.tryParse(normalizedNumberLabel) == selectedOrdinal) {
-      return true;
-    }
-
-    return title == episodeTitle;
+    return episodeSelector.matchesEpisode(
+      id: id,
+      numberLabel: numberLabel,
+      title: title,
+    );
   }
 
   @override
@@ -51,18 +48,9 @@ class PlayerScreenContext {
 
     return other is PlayerScreenContext &&
         other.seriesId == seriesId &&
-        other.seriesTitle == seriesTitle &&
-        other.episodeId == episodeId &&
-        other.episodeNumberLabel == episodeNumberLabel &&
-        other.episodeTitle == episodeTitle;
+        other.episodeId == episodeId;
   }
 
   @override
-  int get hashCode => Object.hash(
-    seriesId,
-    seriesTitle,
-    episodeId,
-    episodeNumberLabel,
-    episodeTitle,
-  );
+  int get hashCode => Object.hash(seriesId, episodeId);
 }

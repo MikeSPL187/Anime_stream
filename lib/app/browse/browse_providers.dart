@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/series.dart';
+import '../../shared/user_facing_async_error.dart';
 import '../di/series_repository_provider.dart';
 
 final browseCatalogProvider = FutureProvider.autoDispose<BrowseCatalogData>((
@@ -40,7 +41,10 @@ Future<_BrowseSliceLoadResult> _loadBrowseSlice(
   } catch (error) {
     return _BrowseSliceLoadResult(
       seriesList: const [],
-      errorMessage: error.toString(),
+      errorMessage: userFacingAsyncErrorMessage(
+        error,
+        fallbackMessage: 'This discovery slice could not be loaded right now.',
+      ),
     );
   }
 }

@@ -164,7 +164,7 @@ void main() {
         expect(details.isWatchStateAvailable, isFalse);
         expect(
           details.watchStateErrorMessage,
-          contains('watch progress unavailable'),
+          'Resume progress and watched markers could not be loaded right now.',
         );
         expect(repository.getSeriesByIdCallCount, 1);
         expect(repository.getEpisodesCallCount, 1);

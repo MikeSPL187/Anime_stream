@@ -146,17 +146,83 @@ void main() {
         );
       },
     );
+
+    test(
+      'hydrates saved titles concurrently while keeping watchlist order stable',
+      () async {
+        final tempDirectory = await Directory.systemTemp.createTemp(
+          'watchlist-concurrency-test',
+        );
+        addTearDown(() async {
+          if (await tempDirectory.exists()) {
+            await tempDirectory.delete(recursive: true);
+          }
+        });
+
+        final watchlistStore = JsonWatchlistStore(
+          directoryProvider: () async => tempDirectory,
+          relativeFilePath: 'watchlist.json',
+        );
+        await watchlistStore.writeAll({
+          'series-1': {
+            'seriesId': 'series-1',
+            'addedAt': DateTime(2026, 4, 7, 10, 0).toIso8601String(),
+          },
+          'series-2': {
+            'seriesId': 'series-2',
+            'addedAt': DateTime(2026, 4, 7, 12, 0).toIso8601String(),
+          },
+        });
+
+        final fakeSeriesRepository = _FakeSeriesRepository(
+          seriesById: {
+            'series-1': const Series(
+              id: 'series-1',
+              slug: 'frieren',
+              title: 'Frieren',
+              availability: AvailabilityState(),
+            ),
+            'series-2': const Series(
+              id: 'series-2',
+              slug: 'pluto',
+              title: 'Pluto',
+              availability: AvailabilityState(),
+            ),
+          },
+          delaysById: const {
+            'series-1': Duration(milliseconds: 40),
+            'series-2': Duration(milliseconds: 40),
+          },
+        );
+        final repository = LocalWatchlistRepository(
+          watchlistStore: watchlistStore,
+          seriesRepository: fakeSeriesRepository,
+        );
+
+        final snapshot = await repository.getWatchlist();
+
+        expect(snapshot.entries.map((entry) => entry.series.id).toList(), [
+          'series-2',
+          'series-1',
+        ]);
+        expect(fakeSeriesRepository.maxConcurrentRequests, greaterThan(1));
+      },
+    );
   });
 }
 
 class _FakeSeriesRepository implements SeriesRepository {
-  const _FakeSeriesRepository({
+  _FakeSeriesRepository({
     required this.seriesById,
     this.errorsById = const {},
+    this.delaysById = const {},
   });
 
   final Map<String, Series> seriesById;
   final Map<String, Object> errorsById;
+  final Map<String, Duration> delaysById;
+  int _activeRequests = 0;
+  int maxConcurrentRequests = 0;
 
   @override
   Future<List<Series>> getLatestSeries({int limit = 20}) async {
@@ -183,17 +249,31 @@ class _FakeSeriesRepository implements SeriesRepository {
 
   @override
   Future<Series> getSeriesById(String seriesId) async {
-    final error = errorsById[seriesId];
-    if (error != null) {
-      throw error;
+    _activeRequests += 1;
+    if (_activeRequests > maxConcurrentRequests) {
+      maxConcurrentRequests = _activeRequests;
     }
 
-    final series = seriesById[seriesId];
-    if (series == null) {
-      throw StateError('Missing series $seriesId');
-    }
+    try {
+      final delay = delaysById[seriesId];
+      if (delay != null) {
+        await Future<void>.delayed(delay);
+      }
 
-    return series;
+      final error = errorsById[seriesId];
+      if (error != null) {
+        throw error;
+      }
+
+      final series = seriesById[seriesId];
+      if (series == null) {
+        throw StateError('Missing series $seriesId');
+      }
+
+      return series;
+    } finally {
+      _activeRequests -= 1;
+    }
   }
 
   @override

@@ -1,18 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:anime_stream_app/app/di/downloads_repository_provider.dart';
+import 'package:anime_stream_app/app/di/episode_playback_repository_provider.dart';
 import 'package:anime_stream_app/app/di/series_repository_provider.dart';
 import 'package:anime_stream_app/app/player/player_playback_providers.dart';
-import 'package:anime_stream_app/data/adapters/anilibria/anilibria_remote_data_source.dart';
-import 'package:anime_stream_app/data/dto/anilibria/anilibria_episode_dto.dart';
-import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_dto.dart';
-import 'package:anime_stream_app/data/dto/anilibria/anilibria_release_page_dto.dart';
 import 'package:anime_stream_app/domain/models/availability_state.dart';
 import 'package:anime_stream_app/domain/models/download_entry.dart';
 import 'package:anime_stream_app/domain/models/episode.dart';
+import 'package:anime_stream_app/domain/models/episode_playback_variant.dart';
+import 'package:anime_stream_app/domain/models/episode_selector.dart';
 import 'package:anime_stream_app/domain/models/series.dart';
 import 'package:anime_stream_app/domain/models/series_catalog_page.dart';
 import 'package:anime_stream_app/domain/repositories/downloads_repository.dart';
+import 'package:anime_stream_app/domain/repositories/episode_playback_repository.dart';
 import 'package:anime_stream_app/domain/repositories/series_repository.dart';
 import 'package:anime_stream_app/features/player/player_screen_context.dart';
 
@@ -219,26 +220,152 @@ void main() {
 
   group('PlayerPlaybackResolver', () {
     test(
-      'resolves playback from shared release details by episode id',
+      'reuses the same playback source provider key when only display copy changes',
       () async {
-        final remoteDataSource = _FakeAnilibriaRemoteDataSource(
-          release: const AnilibriaReleaseDto(
-            id: 'series-501',
-            episodes: [
-              AnilibriaEpisodeDto(
-                id: 'episode-7',
-                releaseId: 'series-501',
-                ordinal: 7,
-                numberLabel: '7',
-                title: 'The Real Thing',
-                hls720Url: 'https://cdn.example.com/episode-7-720.m3u8',
-                hls1080Url: 'https://cdn.example.com/episode-7-1080.m3u8',
-              ),
-            ],
+        final playbackRepository = _FakeEpisodePlaybackRepository(
+          variants: const [
+            EpisodePlaybackVariant(
+              sourceUri: 'https://cdn.example.com/episode-7-1080.m3u8',
+              qualityLabel: '1080p',
+            ),
+          ],
+        );
+        final firstContext = const PlayerScreenContext(
+          seriesId: 'series-501',
+          seriesTitle: 'Pluto',
+          episodeId: 'episode-7',
+          episodeNumberLabel: '7',
+          episodeTitle: 'The Real Thing',
+        );
+        final renamedContext = const PlayerScreenContext(
+          seriesId: 'series-501',
+          seriesTitle: 'Pluto Remastered',
+          episodeId: 'episode-7',
+          episodeNumberLabel: '07',
+          episodeTitle: 'The Real Thing - Director Cut',
+        );
+        final container = ProviderContainer(
+          overrides: [
+            episodePlaybackRepositoryProvider.overrideWithValue(
+              playbackRepository,
+            ),
+            downloadsRepositoryProvider.overrideWithValue(
+              const _NoOpDownloadsRepository(),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        expect(firstContext, renamedContext);
+
+        final subscription = container.listen(
+          playerPlaybackSourceProvider(firstContext),
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+
+        await container.read(playerPlaybackSourceProvider(firstContext).future);
+        await container.read(
+          playerPlaybackSourceProvider(renamedContext).future,
+        );
+
+        expect(playbackRepository.requestedSeriesIds, ['series-501']);
+        expect(playbackRepository.requestedSelectors, [
+          const EpisodeSelector(
+            episodeId: 'episode-7',
+            episodeNumberLabel: '7',
+            episodeTitle: 'The Real Thing',
           ),
+        ]);
+      },
+    );
+
+    test(
+      'treats different episode ids as different playback source keys',
+      () async {
+        final playbackRepository = _FakeEpisodePlaybackRepository(
+          variants: const [
+            EpisodePlaybackVariant(
+              sourceUri: 'https://cdn.example.com/episode-7-1080.m3u8',
+              qualityLabel: '1080p',
+            ),
+          ],
+        );
+        final firstContext = const PlayerScreenContext(
+          seriesId: 'series-501',
+          seriesTitle: 'Pluto',
+          episodeId: 'episode-7',
+          episodeNumberLabel: '7',
+          episodeTitle: 'The Real Thing',
+        );
+        final nextEpisodeContext = const PlayerScreenContext(
+          seriesId: 'series-501',
+          seriesTitle: 'Pluto',
+          episodeId: 'episode-8',
+          episodeNumberLabel: '8',
+          episodeTitle: 'Another Episode',
+        );
+        final container = ProviderContainer(
+          overrides: [
+            episodePlaybackRepositoryProvider.overrideWithValue(
+              playbackRepository,
+            ),
+            downloadsRepositoryProvider.overrideWithValue(
+              const _NoOpDownloadsRepository(),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        expect(firstContext == nextEpisodeContext, isFalse);
+
+        final subscription = container.listen(
+          playerPlaybackSourceProvider(firstContext),
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+
+        await container.read(playerPlaybackSourceProvider(firstContext).future);
+        await container.read(
+          playerPlaybackSourceProvider(nextEpisodeContext).future,
+        );
+
+        expect(playbackRepository.requestedSeriesIds, [
+          'series-501',
+          'series-501',
+        ]);
+        expect(playbackRepository.requestedSelectors, [
+          const EpisodeSelector(
+            episodeId: 'episode-7',
+            episodeNumberLabel: '7',
+            episodeTitle: 'The Real Thing',
+          ),
+          const EpisodeSelector(
+            episodeId: 'episode-8',
+            episodeNumberLabel: '8',
+            episodeTitle: 'Another Episode',
+          ),
+        ]);
+      },
+    );
+
+    test(
+      'resolves playback from the product-facing episode playback repository',
+      () async {
+        final playbackRepository = _FakeEpisodePlaybackRepository(
+          variants: const [
+            EpisodePlaybackVariant(
+              sourceUri: 'https://cdn.example.com/episode-7-1080.m3u8',
+              qualityLabel: '1080p',
+            ),
+            EpisodePlaybackVariant(
+              sourceUri: 'https://cdn.example.com/episode-7-720.m3u8',
+              qualityLabel: '720p',
+            ),
+          ],
         );
         final resolver = PlayerPlaybackResolver(
-          remoteDataSource: remoteDataSource,
+          episodePlaybackRepository: playbackRepository,
           downloadsRepository: const _NoOpDownloadsRepository(),
         );
 
@@ -252,85 +379,81 @@ void main() {
           ),
         );
 
-        expect(remoteDataSource.requestedReleaseIds, ['series-501']);
+        expect(playbackRepository.requestedSeriesIds, ['series-501']);
         expect(source.qualityLabel, '1080p');
         expect(source.streamUri, 'https://cdn.example.com/episode-7-1080.m3u8');
+        expect(
+          source.variants.map((variant) => variant.qualityLabel).toList(),
+          ['1080p', '720p'],
+        );
       },
     );
 
-    test('matches by episode number label when ids differ', () async {
-      final resolver = PlayerPlaybackResolver(
-        remoteDataSource: _FakeAnilibriaRemoteDataSource(
-          release: const AnilibriaReleaseDto(
-            id: 'series-42',
-            episodes: [
-              AnilibriaEpisodeDto(
-                id: 'provider-episode-2-5',
-                releaseId: 'series-42',
-                ordinal: 2500,
-                numberLabel: '2.5',
-                title: 'Bonus Episode',
-                hls720Url: 'https://cdn.example.com/bonus-720.m3u8',
-              ),
-            ],
+    test(
+      'rewraps repository lookup errors into player resolution errors',
+      () async {
+        final resolver = PlayerPlaybackResolver(
+          episodePlaybackRepository: _ThrowingEpisodePlaybackRepository(
+            const EpisodePlaybackLookupException(
+              'No supported remote playback variants are available for Episode 1.',
+            ),
           ),
-        ),
-        downloadsRepository: const _NoOpDownloadsRepository(),
-      );
+          downloadsRepository: const _NoOpDownloadsRepository(),
+        );
 
-      final source = await resolver.resolve(
-        const PlayerScreenContext(
-          seriesId: 'series-42',
-          seriesTitle: 'Monster',
-          episodeId: 'ui-episode-id',
-          episodeNumberLabel: '2.5',
-          episodeTitle: 'Untrusted UI Title',
-        ),
-      );
-
-      expect(source.qualityLabel, '720p');
-      expect(source.streamUri, 'https://cdn.example.com/bonus-720.m3u8');
-    });
-
-    test('throws when the matched episode has no supported HLS stream', () async {
-      final resolver = PlayerPlaybackResolver(
-        remoteDataSource: _FakeAnilibriaRemoteDataSource(
-          release: const AnilibriaReleaseDto(
-            id: 'series-12',
-            episodes: [
-              AnilibriaEpisodeDto(
-                id: 'episode-1',
-                releaseId: 'series-12',
-                ordinal: 1,
-                numberLabel: '1',
-                title: 'Pilot',
-              ),
-            ],
+        await expectLater(
+          () => resolver.resolve(
+            const PlayerScreenContext(
+              seriesId: 'series-12',
+              seriesTitle: 'Serial Experiments Lain',
+              episodeId: 'episode-1',
+              episodeNumberLabel: '1',
+              episodeTitle: 'Pilot',
+            ),
           ),
-        ),
-        downloadsRepository: const _NoOpDownloadsRepository(),
-      );
-
-      await expectLater(
-        () => resolver.resolve(
-          const PlayerScreenContext(
-            seriesId: 'series-12',
-            seriesTitle: 'Serial Experiments Lain',
-            episodeId: 'episode-1',
-            episodeNumberLabel: '1',
-            episodeTitle: 'Pilot',
+          throwsA(
+            isA<PlayerPlaybackResolutionException>().having(
+              (error) => error.message,
+              'message',
+              'No supported remote playback variants are available for Episode 1.',
+            ),
           ),
-        ),
-        throwsA(
-          isA<PlayerPlaybackResolutionException>().having(
-            (error) => error.message,
-            'message',
-            'No supported remote playback variants are available for Episode 1.',
-          ),
-        ),
-      );
-    });
+        );
+      },
+    );
   });
+}
+
+class _FakeEpisodePlaybackRepository implements EpisodePlaybackRepository {
+  _FakeEpisodePlaybackRepository({required this.variants});
+
+  final List<EpisodePlaybackVariant> variants;
+  final List<String> requestedSeriesIds = [];
+  final List<EpisodeSelector> requestedSelectors = [];
+
+  @override
+  Future<List<EpisodePlaybackVariant>> getRemotePlaybackVariants({
+    required String seriesId,
+    required EpisodeSelector episodeSelector,
+  }) async {
+    requestedSeriesIds.add(seriesId);
+    requestedSelectors.add(episodeSelector);
+    return variants;
+  }
+}
+
+class _ThrowingEpisodePlaybackRepository implements EpisodePlaybackRepository {
+  const _ThrowingEpisodePlaybackRepository(this.error);
+
+  final EpisodePlaybackLookupException error;
+
+  @override
+  Future<List<EpisodePlaybackVariant>> getRemotePlaybackVariants({
+    required String seriesId,
+    required EpisodeSelector episodeSelector,
+  }) async {
+    throw error;
+  }
 }
 
 class _NoOpDownloadsRepository implements DownloadsRepository {
@@ -350,6 +473,9 @@ class _NoOpDownloadsRepository implements DownloadsRepository {
     required String seriesId,
     required String episodeId,
     String selectedQuality = '1080p',
+    String? seriesTitle,
+    String? episodeNumberLabel,
+    String? episodeTitle,
   }) async {
     throw UnimplementedError();
   }
@@ -399,60 +525,6 @@ class _FakeSeriesRepository implements SeriesRepository {
 
   @override
   Future<List<Series>> searchSeries(String query, {int limit = 20}) async {
-    throw UnimplementedError();
-  }
-}
-
-class _FakeAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
-  _FakeAnilibriaRemoteDataSource({required this.release});
-
-  final AnilibriaReleaseDto release;
-  final List<String> requestedReleaseIds = [];
-
-  @override
-  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) async {
-    requestedReleaseIds.add(releaseId);
-    return release;
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchPopularReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<AnilibriaReleasePageDto> fetchCatalogPage({
-    int page = 1,
-    int limit = 20,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaEpisodeDto>> fetchReleaseEpisodes(String releaseId) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchSimulcastReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<AnilibriaReleaseDto>> searchReleases(
-    String query, {
-    int limit = 20,
-  }) {
     throw UnimplementedError();
   }
 }

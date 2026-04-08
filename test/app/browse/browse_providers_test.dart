@@ -42,7 +42,10 @@ void main() {
 
       expect(catalog.latestReleases.map((series) => series.id), ['latest-1']);
       expect(catalog.trendingSeries, isEmpty);
-      expect(catalog.trendingError, contains('Trending unavailable'));
+      expect(
+        catalog.trendingError,
+        'This discovery slice could not be loaded right now.',
+      );
       expect(catalog.popularSeries.map((series) => series.id), ['popular-1']);
       expect(catalog.hasAnyContent, isTrue);
       expect(catalog.hasAnyUnavailableSlice, isTrue);

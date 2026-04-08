@@ -12,6 +12,9 @@ abstract interface class DownloadsRepository {
     required String seriesId,
     required String episodeId,
     String selectedQuality = '1080p',
+    String? seriesTitle,
+    String? episodeNumberLabel,
+    String? episodeTitle,
   });
 
   Future<void> removeDownload(String downloadId);
