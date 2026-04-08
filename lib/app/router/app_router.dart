@@ -55,11 +55,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutePaths.player,
+        redirect: (context, state) {
+          if (state.extra is! PlayerScreenContext) {
+            return AppRoutePaths.home;
+          }
+          return null;
+        },
         builder: (context, state) {
-          final sessionContext = state.extra is PlayerScreenContext
-              ? state.extra as PlayerScreenContext
-              : null;
-
+          final sessionContext = state.extra as PlayerScreenContext;
           return PlayerScreen(sessionContext: sessionContext);
         },
       ),
