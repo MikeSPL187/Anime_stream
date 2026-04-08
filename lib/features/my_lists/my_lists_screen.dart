@@ -39,18 +39,18 @@ class MyListsScreen extends ConsumerWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
           _SummaryStrip(
             watchlistCount: watchlist.asData?.value.length,
             downloadsCount: downloads.asData?.value.length,
             historyCount: history.asData?.value.length,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
           _WatchlistSection(watchlist: watchlist),
-          const SizedBox(height: 28),
+          const SizedBox(height: 26),
           _DownloadsSection(downloads: downloads),
-          const SizedBox(height: 28),
+          const SizedBox(height: 26),
           _HistorySection(history: history),
         ],
       ),
@@ -135,18 +135,15 @@ class _WatchlistSection extends StatelessWidget {
                   'Add titles from a series page to keep them here for later.',
             )
           else
-            _SurfaceBlock(
-              child: Column(
-                children: [
-                  for (
-                    var index = 0;
-                    index < entries.take(4).length;
-                    index++
-                  ) ...[
-                    if (index > 0) const Divider(height: 20),
-                    _WatchlistRow(entry: entries[index]),
-                  ],
-                ],
+            SizedBox(
+              height: 244,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: entries.take(4).length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return _WatchlistCard(entry: entries[index]);
+                },
               ),
             ),
         ],
@@ -192,18 +189,15 @@ class _DownloadsSection extends StatelessWidget {
                   'Download episodes from a series page to build an offline library.',
             )
           else
-            _SurfaceBlock(
-              child: Column(
-                children: [
-                  for (
-                    var index = 0;
-                    index < entries.take(4).length;
-                    index++
-                  ) ...[
-                    if (index > 0) const Divider(height: 20),
-                    _DownloadPreviewRow(entry: entries[index]),
-                  ],
-                ],
+            SizedBox(
+              height: 244,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: entries.take(4).length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return _DownloadPreviewCard(entry: entries[index]);
+                },
               ),
             ),
         ],
@@ -249,18 +243,15 @@ class _HistorySection extends StatelessWidget {
                   'Finished episodes will appear here after watch completion.',
             )
           else
-            _SurfaceBlock(
-              child: Column(
-                children: [
-                  for (
-                    var index = 0;
-                    index < entries.take(4).length;
-                    index++
-                  ) ...[
-                    if (index > 0) const Divider(height: 20),
-                    _HistoryRow(entry: entries[index]),
-                  ],
-                ],
+            SizedBox(
+              height: 244,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: entries.take(4).length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return _HistoryCard(entry: entries[index]);
+                },
               ),
             ),
         ],
@@ -269,111 +260,54 @@ class _HistorySection extends StatelessWidget {
   }
 }
 
-class _WatchlistRow extends StatelessWidget {
-  const _WatchlistRow({required this.entry});
+class _WatchlistCard extends StatelessWidget {
+  const _WatchlistCard({required this.entry});
 
   final WatchlistEntry entry;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Poster(
-              imageUrl: entry.series.posterImageUrl,
-              label: entry.series.title,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(entry.series.title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Saved for later',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
+    return _MediaShelfCard(
+      imageUrl: entry.series.posterImageUrl,
+      title: entry.series.title,
+      subtitle: 'Saved for later',
+      metadata: <String>[
+        if (entry.series.releaseYear != null) '${entry.series.releaseYear}',
+        if (entry.series.genres.isNotEmpty) entry.series.genres.first,
+      ].join(' • '),
+      pillLabel: 'Watchlist',
+      pillIcon: Icons.bookmark_rounded,
+      onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
     );
   }
 }
 
-class _HistoryRow extends StatelessWidget {
-  const _HistoryRow({required this.entry});
+class _HistoryCard extends StatelessWidget {
+  const _HistoryCard({required this.entry});
 
   final HistoryEntry entry;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final episodeTitle = entry.episode.title.trim().isEmpty
         ? 'Episode ${entry.episode.numberLabel}'
         : entry.episode.title;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Poster(
-              imageUrl: entry.series.posterImageUrl,
-              label: entry.series.title,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(entry.series.title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$episodeTitle • Episode ${entry.episode.numberLabel}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
+    return _MediaShelfCard(
+      imageUrl: entry.series.posterImageUrl,
+      title: entry.series.title,
+      subtitle: episodeTitle,
+      metadata:
+          'Episode ${entry.episode.numberLabel} • Watched ${_formatHistoryDate(entry.watchedAt)}',
+      pillLabel: 'History',
+      pillIcon: Icons.history_rounded,
+      onTap: () => context.push(AppRoutePaths.seriesDetails(entry.series.id)),
     );
   }
 }
 
-class _DownloadPreviewRow extends ConsumerWidget {
-  const _DownloadPreviewRow({required this.entry});
+class _DownloadPreviewCard extends ConsumerWidget {
+  const _DownloadPreviewCard({required this.entry});
 
   final DownloadEntry entry;
 
@@ -381,105 +315,157 @@ class _DownloadPreviewRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final details = ref.watch(seriesDetailsProvider(entry.seriesId));
     return details.when(
-      loading: () => _DownloadPreviewFallback(entry: entry),
-      error: (error, stackTrace) => _DownloadPreviewFallback(entry: entry),
+      loading: () => _MediaShelfCard(
+        imageUrl: null,
+        title: entry.seriesId,
+        subtitle: 'Episode ${entry.episodeId}',
+        metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
+        pillLabel: 'Downloads',
+        pillIcon: entry.isPlayableOffline
+            ? Icons.offline_pin_rounded
+            : Icons.download_rounded,
+        onTap: () => context.push(AppRoutePaths.downloads),
+      ),
+      error: (error, stackTrace) => _MediaShelfCard(
+        imageUrl: null,
+        title: entry.seriesId,
+        subtitle: 'Episode ${entry.episodeId}',
+        metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
+        pillLabel: 'Downloads',
+        pillIcon: entry.isPlayableOffline
+            ? Icons.offline_pin_rounded
+            : Icons.download_rounded,
+        onTap: () => context.push(AppRoutePaths.downloads),
+      ),
       data: (details) {
-        final series = details.series;
         final episode = _findEpisode(details.episodes, entry.episodeId);
         final episodeLabel = episode == null
             ? 'Episode ${entry.episodeId}'
             : 'Episode ${episode.numberLabel}';
-
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => context.push(AppRoutePaths.downloads),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Poster(imageUrl: series.posterImageUrl, label: series.title),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        series.title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$episodeLabel • ${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  entry.isPlayableOffline
-                      ? Icons.offline_pin_rounded
-                      : Icons.chevron_right_rounded,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
+        return _MediaShelfCard(
+          imageUrl: details.series.posterImageUrl,
+          title: details.series.title,
+          subtitle: episodeLabel,
+          metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
+          pillLabel: entry.isPlayableOffline ? 'Offline ready' : 'Downloads',
+          pillIcon: entry.isPlayableOffline
+              ? Icons.offline_pin_rounded
+              : Icons.download_rounded,
+          onTap: () => context.push(AppRoutePaths.downloads),
         );
       },
     );
   }
 }
 
-class _DownloadPreviewFallback extends StatelessWidget {
-  const _DownloadPreviewFallback({required this.entry});
+class _MediaShelfCard extends StatelessWidget {
+  const _MediaShelfCard({
+    required this.imageUrl,
+    required this.title,
+    required this.subtitle,
+    required this.metadata,
+    required this.pillLabel,
+    required this.pillIcon,
+    required this.onTap,
+  });
 
-  final DownloadEntry entry;
+  final String? imageUrl;
+  final String title;
+  final String subtitle;
+  final String metadata;
+  final String pillLabel;
+  final IconData pillIcon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _Poster(imageUrl: null, label: entry.seriesId),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                entry.seriesId,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Episode ${entry.episodeId} • ${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: 170,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimeCachedArtwork(
+                  imageUrl: imageUrl,
+                  label: title,
+                  icon: Icons.movie_creation_outlined,
+                  alignment: Alignment.topCenter,
                 ),
-              ),
-            ],
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.04),
+                          Colors.black.withValues(alpha: 0.14),
+                          Colors.black.withValues(alpha: 0.9),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  child: _OverlayPill(label: pillLabel, icon: pillIcon),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          height: 1.08,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.88),
+                        ),
+                      ),
+                      if (metadata.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          metadata,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.78),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
-}
-
-Episode? _findEpisode(List<Episode> episodes, String episodeId) {
-  for (final episode in episodes) {
-    if (episode.id == episodeId) {
-      return episode;
-    }
-  }
-  return null;
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -535,7 +521,7 @@ class _SectionLoading extends StatelessWidget {
         _SectionHeader(title: title, subtitle: message),
         const SizedBox(height: 12),
         const SizedBox(
-          height: 120,
+          height: 160,
           child: Center(child: CircularProgressIndicator()),
         ),
       ],
@@ -578,43 +564,34 @@ class _SectionMessage extends StatelessWidget {
   }
 }
 
-class _SurfaceBlock extends StatelessWidget {
-  const _SurfaceBlock({required this.child});
+class _OverlayPill extends StatelessWidget {
+  const _OverlayPill({required this.label, required this.icon});
 
-  final Widget child;
+  final String label;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Padding(padding: const EdgeInsets.all(16), child: child),
-    );
-  }
-}
-
-class _Poster extends StatelessWidget {
-  const _Poster({required this.imageUrl, required this.label});
-
-  final String? imageUrl;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 72,
-        child: AspectRatio(
-          aspectRatio: 2 / 3,
-          child: AnimeCachedArtwork(
-            imageUrl: imageUrl,
-            label: label,
-            icon: Icons.movie_creation_outlined,
-          ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -644,6 +621,15 @@ class _CountBadge extends StatelessWidget {
   }
 }
 
+Episode? _findEpisode(List<Episode> episodes, String episodeId) {
+  for (final episode in episodes) {
+    if (episode.id == episodeId) {
+      return episode;
+    }
+  }
+  return null;
+}
+
 String _downloadStatusLabel(DownloadEntry entry) {
   return switch (entry.status) {
     DownloadStatus.completed when entry.isPlayableOffline =>
@@ -654,4 +640,25 @@ String _downloadStatusLabel(DownloadEntry entry) {
     DownloadStatus.paused => 'Paused',
     DownloadStatus.failed => 'Failed',
   };
+}
+
+String _formatHistoryDate(DateTime watchedAt) {
+  final date = watchedAt.toLocal();
+  final month = switch (date.month) {
+    1 => 'Jan',
+    2 => 'Feb',
+    3 => 'Mar',
+    4 => 'Apr',
+    5 => 'May',
+    6 => 'Jun',
+    7 => 'Jul',
+    8 => 'Aug',
+    9 => 'Sep',
+    10 => 'Oct',
+    11 => 'Nov',
+    12 => 'Dec',
+    _ => '',
+  };
+
+  return '$month ${date.day}';
 }
