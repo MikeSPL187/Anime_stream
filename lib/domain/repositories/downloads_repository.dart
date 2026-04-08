@@ -8,19 +8,11 @@ abstract interface class DownloadsRepository {
     required String episodeId,
   });
 
-  Future<void> queueEpisodeDownload({
-    required String seriesId,
-    required String episodeId,
-    String selectedQuality = '1080p',
-  });
-
   Future<DownloadEntry> startEpisodeDownload({
     required String seriesId,
     required String episodeId,
     String selectedQuality = '1080p',
   });
-
-  Future<void> pauseDownload(String downloadId);
 
   Future<void> removeDownload(String downloadId);
 }

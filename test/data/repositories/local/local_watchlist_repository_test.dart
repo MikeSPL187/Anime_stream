@@ -70,14 +70,21 @@ void main() {
           ),
         );
 
-        final initialEntries = await repository.getWatchlist();
+        final initialSnapshot = await repository.getWatchlist();
+        final normalizedStore = await watchlistStore.readAll();
 
-        expect(initialEntries, hasLength(2));
-        expect(initialEntries.first.series.id, 'series-2');
-        expect(initialEntries.first.status, WatchlistEntryStatus.queued);
-        expect(initialEntries.last.series.id, 'series-1');
+        expect(initialSnapshot.entries, hasLength(2));
+        expect(initialSnapshot.temporarilyUnavailableCount, 0);
+        expect(initialSnapshot.entries.first.series.id, 'series-2');
+        expect(
+          initialSnapshot.entries.first.status,
+          WatchlistEntryStatus.queued,
+        );
+        expect(initialSnapshot.entries.last.series.id, 'series-1');
         expect(await repository.isInWatchlist('series-1'), isTrue);
+        expect(await repository.isInWatchlist('missing'), isFalse);
         expect(await repository.isInWatchlist('series-3'), isFalse);
+        expect(normalizedStore.containsKey('missing'), isFalse);
 
         await repository.addToWatchlist('series-3');
 
@@ -85,23 +92,74 @@ void main() {
 
         await repository.removeFromWatchlist('series-2');
 
-        final updatedEntries = await repository.getWatchlist();
-        expect(updatedEntries.map((entry) => entry.series.id), [
+        final updatedSnapshot = await repository.getWatchlist();
+        expect(updatedSnapshot.temporarilyUnavailableCount, 0);
+        expect(updatedSnapshot.entries.map((entry) => entry.series.id), [
           'series-3',
           'series-1',
         ]);
+      },
+    );
+
+    test(
+      'preserves saved membership when series lookup fails for a transient reason',
+      () async {
+        final tempDirectory = await Directory.systemTemp.createTemp(
+          'watchlist-transient-failure-test',
+        );
+        addTearDown(() async {
+          if (await tempDirectory.exists()) {
+            await tempDirectory.delete(recursive: true);
+          }
+        });
+
+        final watchlistStore = JsonWatchlistStore(
+          directoryProvider: () async => tempDirectory,
+          relativeFilePath: 'watchlist.json',
+        );
+        await watchlistStore.writeAll({
+          'series-1': {
+            'seriesId': 'series-1',
+            'addedAt': DateTime(2026, 4, 6, 10, 0).toIso8601String(),
+          },
+        });
+
+        final repository = LocalWatchlistRepository(
+          watchlistStore: watchlistStore,
+          seriesRepository: _FakeSeriesRepository(
+            seriesById: const {},
+            errorsById: {'series-1': Exception('network unavailable')},
+          ),
+        );
+
+        expect(await repository.isInWatchlist('series-1'), isTrue);
+        expect(
+          (await watchlistStore.readAll()).containsKey('series-1'),
+          isTrue,
+        );
+        final snapshot = await repository.getWatchlist();
+        expect(snapshot.entries, isEmpty);
+        expect(snapshot.temporarilyUnavailableCount, 1);
+        expect(
+          (await watchlistStore.readAll()).containsKey('series-1'),
+          isTrue,
+        );
       },
     );
   });
 }
 
 class _FakeSeriesRepository implements SeriesRepository {
-  const _FakeSeriesRepository({required this.seriesById});
+  const _FakeSeriesRepository({
+    required this.seriesById,
+    this.errorsById = const {},
+  });
 
   final Map<String, Series> seriesById;
+  final Map<String, Object> errorsById;
 
   @override
-  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
+  Future<List<Series>> getLatestSeries({int limit = 20}) async {
     throw UnimplementedError();
   }
 
@@ -125,6 +183,11 @@ class _FakeSeriesRepository implements SeriesRepository {
 
   @override
   Future<Series> getSeriesById(String seriesId) async {
+    final error = errorsById[seriesId];
+    if (error != null) {
+      throw error;
+    }
+
     final series = seriesById[seriesId];
     if (series == null) {
       throw StateError('Missing series $seriesId');

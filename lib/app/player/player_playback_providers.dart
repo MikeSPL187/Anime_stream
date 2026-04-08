@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/adapters/anilibria/anilibria_remote_data_source.dart';
 import '../../data/dto/anilibria/anilibria_episode_dto.dart';
 import '../../domain/models/download_entry.dart';
+import '../../domain/models/episode.dart';
 import '../../domain/repositories/downloads_repository.dart';
 import '../../features/player/player_screen_context.dart';
 import '../di/downloads_repository_provider.dart';
 import '../di/series_repository_provider.dart';
+import '../series/series_providers.dart';
 import 'player_playback_source.dart';
 
 final playerPlaybackResolverProvider = Provider<PlayerPlaybackResolver>((ref) {
@@ -22,6 +24,76 @@ final playerPlaybackSourceProvider = FutureProvider.autoDispose
     .family<PlayerPlaybackSource, PlayerScreenContext>((ref, sessionContext) {
       final resolver = ref.watch(playerPlaybackResolverProvider);
       return resolver.resolve(sessionContext);
+    });
+
+final playerNextEpisodeContextProvider = FutureProvider.autoDispose
+    .family<PlayerScreenContext?, PlayerScreenContext>((
+      ref,
+      sessionContext,
+    ) async {
+      final content = await ref.watch(
+        seriesContentProvider(sessionContext.seriesId).future,
+      );
+      final sortedEpisodes = content.episodes.toList(growable: false)
+        ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+
+      for (var index = 0; index < sortedEpisodes.length; index++) {
+        final episode = sortedEpisodes[index];
+        if (!_matchesSeriesEpisode(episode, sessionContext)) {
+          continue;
+        }
+
+        final nextIndex = index + 1;
+        if (nextIndex >= sortedEpisodes.length) {
+          return null;
+        }
+
+        final nextEpisode = sortedEpisodes[nextIndex];
+        return PlayerScreenContext(
+          seriesId: content.series.id,
+          seriesTitle: content.series.title,
+          episodeId: nextEpisode.id,
+          episodeNumberLabel: nextEpisode.numberLabel,
+          episodeTitle: _playerEpisodeTitle(nextEpisode),
+        );
+      }
+
+      return null;
+    });
+
+final playerPreviousEpisodeContextProvider = FutureProvider.autoDispose
+    .family<PlayerScreenContext?, PlayerScreenContext>((
+      ref,
+      sessionContext,
+    ) async {
+      final content = await ref.watch(
+        seriesContentProvider(sessionContext.seriesId).future,
+      );
+      final sortedEpisodes = content.episodes.toList(growable: false)
+        ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+
+      for (var index = 0; index < sortedEpisodes.length; index++) {
+        final episode = sortedEpisodes[index];
+        if (!_matchesSeriesEpisode(episode, sessionContext)) {
+          continue;
+        }
+
+        final previousIndex = index - 1;
+        if (previousIndex < 0) {
+          return null;
+        }
+
+        final previousEpisode = sortedEpisodes[previousIndex];
+        return PlayerScreenContext(
+          seriesId: content.series.id,
+          seriesTitle: content.series.title,
+          episodeId: previousEpisode.id,
+          episodeNumberLabel: previousEpisode.numberLabel,
+          episodeTitle: _playerEpisodeTitle(previousEpisode),
+        );
+      }
+
+      return null;
     });
 
 class PlayerPlaybackResolver {
@@ -110,31 +182,11 @@ class PlayerPlaybackResolver {
     }
 
     for (final episode in episodes) {
-      if (episode.id == context.episodeId) {
-        return episode;
-      }
-    }
-
-    final selectedNumberLabel = context.episodeNumberLabel.trim();
-    for (final episode in episodes) {
-      final episodeNumberLabel = episode.numberLabel?.trim();
-      if (episodeNumberLabel == selectedNumberLabel) {
-        return episode;
-      }
-    }
-
-    final selectedOrdinal = context.episodeOrdinal;
-    if (selectedOrdinal != null) {
-      for (final episode in episodes) {
-        final episodeOrdinal = num.tryParse(episode.numberLabel?.trim() ?? '');
-        if (episodeOrdinal == selectedOrdinal) {
-          return episode;
-        }
-      }
-    }
-
-    for (final episode in episodes) {
-      if (episode.title == context.episodeTitle) {
+      if (context.matchesEpisode(
+        id: episode.id,
+        numberLabel: episode.numberLabel ?? '',
+        title: episode.title ?? '',
+      )) {
         return episode;
       }
     }
@@ -230,4 +282,21 @@ class PlayerPlaybackResolutionException implements Exception {
 
   @override
   String toString() => message;
+}
+
+bool _matchesSeriesEpisode(Episode episode, PlayerScreenContext context) {
+  return context.matchesEpisode(
+    id: episode.id,
+    numberLabel: episode.numberLabel,
+    title: episode.title,
+  );
+}
+
+String _playerEpisodeTitle(Episode episode) {
+  final trimmedTitle = episode.title.trim();
+  if (trimmedTitle.isNotEmpty) {
+    return trimmedTitle;
+  }
+
+  return 'Episode ${episode.numberLabel}';
 }

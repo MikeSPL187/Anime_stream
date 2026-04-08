@@ -62,6 +62,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  void _submitSearch() {
+    _debounce?.cancel();
+    _commitSearchFromDraft();
+    FocusScope.of(context).unfocus();
+  }
+
   void _clearSearch() {
     _debounce?.cancel();
     _queryController.clear();
@@ -88,6 +94,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               controller: _queryController,
               hasText: _draftQuery.trim().isNotEmpty,
               onClear: _clearSearch,
+              onSubmitted: _submitSearch,
             ),
           ),
           Expanded(
@@ -107,11 +114,13 @@ class _SearchField extends StatelessWidget {
     required this.controller,
     required this.hasText,
     required this.onClear,
+    required this.onSubmitted,
   });
 
   final TextEditingController controller;
   final bool hasText;
   final VoidCallback onClear;
+  final VoidCallback onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +130,7 @@ class _SearchField extends StatelessWidget {
       controller: controller,
       autofocus: true,
       textInputAction: TextInputAction.search,
+      onSubmitted: (_) => onSubmitted(),
       decoration: InputDecoration(
         hintText: 'Search anime titles',
         prefixIcon: const Icon(Icons.search_rounded),
@@ -163,6 +173,14 @@ class _SearchBody extends StatelessWidget {
       );
     }
 
+    if (searchResults == null) {
+      return const _SearchState(
+        icon: Icons.schedule_rounded,
+        title: 'Ready to search',
+        message: 'Press search or pause briefly to load matches.',
+      );
+    }
+
     return searchResults!.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stackTrace) => _SearchState(
@@ -188,6 +206,7 @@ class _SearchBody extends StatelessWidget {
         final otherResults = seriesList.skip(1).toList(growable: false);
 
         return ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           children: [
             _TopResultTile(series: topMatch),
@@ -343,6 +362,7 @@ class _SearchResultRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final originalTitle = _searchOriginalTitle(series);
     final metadata = <String>[
       if (series.releaseYear != null) '${series.releaseYear}',
       if (series.genres.isNotEmpty) series.genres.first,
@@ -399,6 +419,17 @@ class _SearchResultRow extends StatelessWidget {
                           height: 1.08,
                         ),
                       ),
+                      if (originalTitle != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          originalTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.84),
+                          ),
+                        ),
+                      ],
                       if (metadata.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -410,7 +441,8 @@ class _SearchResultRow extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if ((series.synopsis ?? '').trim().isNotEmpty) ...[
+                      if (originalTitle == null &&
+                          (series.synopsis ?? '').trim().isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Expanded(
                           child: Text(
@@ -444,6 +476,17 @@ class _SearchResultRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _searchOriginalTitle(Series series) {
+  final originalTitle = series.originalTitle?.trim();
+  if (originalTitle == null || originalTitle.isEmpty) {
+    return null;
+  }
+  if (originalTitle == series.title.trim()) {
+    return null;
+  }
+  return originalTitle;
 }
 
 class _SearchState extends StatelessWidget {

@@ -74,38 +74,54 @@ class AnimeArtworkFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surfaceContainerHighest,
-            theme.colorScheme.surfaceContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: theme.colorScheme.onSurfaceVariant),
-            if (label.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                label,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 72 || constraints.maxWidth < 72;
+        final showLabel =
+            !compact &&
+            label.trim().isNotEmpty &&
+            constraints.maxHeight >= 88 &&
+            constraints.maxWidth >= 88;
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.surfaceContainerHighest,
+                theme.colorScheme.surfaceContainer,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 8 : 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: compact ? 18 : 24,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ),
-            ],
-          ],
-        ),
-      ),
+                if (showLabel) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    label,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

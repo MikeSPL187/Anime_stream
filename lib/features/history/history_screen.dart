@@ -13,21 +13,37 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(watchHistoryProvider);
+    Future<void> refreshHistory() async {
+      ref.invalidate(watchHistoryProvider);
+      try {
+        await ref.read(watchHistoryProvider.future);
+      } catch (_) {
+        return;
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('History')),
-      body: history.when(
-        loading: () => const _CenteredState(
-          icon: Icons.history_rounded,
-          title: 'Loading history',
-          message: 'Completed episodes are being loaded.',
+      body: RefreshIndicator(
+        onRefresh: refreshHistory,
+        child: history.when(
+          loading: () => const _CenteredState(
+            icon: Icons.history_rounded,
+            title: 'Loading history',
+            message: 'Completed episodes are being loaded.',
+          ),
+          error: (error, stackTrace) => _CenteredState(
+            icon: Icons.error_outline_rounded,
+            title: 'History unavailable',
+            message: 'Watch history could not be loaded.\n$error',
+            action: FilledButton.icon(
+              onPressed: refreshHistory,
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Retry'),
+            ),
+          ),
+          data: (entries) => _HistoryBody(entries: entries),
         ),
-        error: (error, stackTrace) => _CenteredState(
-          icon: Icons.error_outline_rounded,
-          title: 'History unavailable',
-          message: 'Watch history could not be loaded.\n$error',
-        ),
-        data: (entries) => _HistoryBody(entries: entries),
       ),
     );
   }
@@ -49,6 +65,7 @@ class _HistoryBody extends StatelessWidget {
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         _SummaryStrip(count: entries.length),
@@ -174,43 +191,52 @@ class _CenteredState extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
+    this.action,
   });
 
   final IconData icon;
   final String title;
   final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40, color: theme.colorScheme.tertiary),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: theme.textTheme.headlineSmall,
-                textAlign: TextAlign.center,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 420),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 40, color: theme.colorScheme.tertiary),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: theme.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (action != null) ...[const SizedBox(height: 16), action!],
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

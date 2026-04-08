@@ -13,6 +13,25 @@ enum SeriesPrimaryWatchActionKind {
 }
 
 @immutable
+class SeriesContentData {
+  SeriesContentData({required this.series, required List<Episode> episodes})
+    : episodes = List.unmodifiable(episodes);
+
+  final Series series;
+  final List<Episode> episodes;
+
+  Episode? episodeById(String episodeId) {
+    for (final episode in episodes) {
+      if (episode.id == episodeId) {
+        return episode;
+      }
+    }
+
+    return null;
+  }
+}
+
+@immutable
 class SeriesPrimaryWatchAction {
   const SeriesPrimaryWatchAction({
     required this.kind,
@@ -33,12 +52,17 @@ class SeriesDetailsData {
     required this.series,
     required List<Episode> episodes,
     Map<String, EpisodeProgress> episodeProgressById = const {},
+    this.watchStateErrorMessage,
   }) : episodes = List.unmodifiable(episodes),
        episodeProgressById = Map.unmodifiable(episodeProgressById);
 
   final Series series;
   final List<Episode> episodes;
   final Map<String, EpisodeProgress> episodeProgressById;
+  final String? watchStateErrorMessage;
+
+  bool get isWatchStateAvailable =>
+      watchStateErrorMessage == null || watchStateErrorMessage!.trim().isEmpty;
 
   EpisodeProgress? progressForEpisode(String episodeId) {
     return episodeProgressById[episodeId];

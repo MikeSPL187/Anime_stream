@@ -3,6 +3,21 @@ import 'package:flutter/foundation.dart';
 enum PlayerPlaybackSourceKind { remoteHls, localHlsManifest, localFile }
 
 @immutable
+class PlayerPlaybackQualityOption {
+  const PlayerPlaybackQualityOption({
+    required this.variantIndex,
+    required this.label,
+    required this.isSelected,
+    required this.isOffline,
+  });
+
+  final int variantIndex;
+  final String label;
+  final bool isSelected;
+  final bool isOffline;
+}
+
+@immutable
 class PlayerPlaybackVariant {
   const PlayerPlaybackVariant({
     required this.sourceUri,
@@ -44,7 +59,32 @@ class PlayerPlaybackSource {
 
   bool get isOffline => activeVariant.isOffline;
 
+  bool get supportsManualQualitySelection => variants.length > 1;
+
   PlayerPlaybackVariant variantAt(int index) => variants[index];
+
+  List<PlayerPlaybackQualityOption> qualityOptions({
+    required int activeVariantIndex,
+  }) {
+    assert(
+      activeVariantIndex >= 0 && activeVariantIndex < variants.length,
+      'Active playback variant index is out of bounds.',
+    );
+
+    if (!supportsManualQualitySelection) {
+      return const [];
+    }
+
+    return List.unmodifiable([
+      for (var index = 0; index < variants.length; index++)
+        PlayerPlaybackQualityOption(
+          variantIndex: index,
+          label: variants[index].qualityLabel,
+          isSelected: index == activeVariantIndex,
+          isOffline: variants[index].isOffline,
+        ),
+    ]);
+  }
 
   bool hasFallbackAfter(int index) => nextVariantIndexAfter(index) != null;
 

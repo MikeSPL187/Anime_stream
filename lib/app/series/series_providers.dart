@@ -1,36 +1,50 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/episode_progress.dart';
-import '../../domain/models/series.dart';
 import '../di/series_repository_provider.dart';
 import '../di/watch_system_repository_provider.dart';
 import 'series_details_data.dart';
 
-final featuredSeriesProvider = FutureProvider.autoDispose<List<Series>>((
-  ref,
-) async {
-  final repository = ref.watch(seriesRepositoryProvider);
-  return repository.getFeaturedSeries();
-});
+final seriesContentProvider = FutureProvider.autoDispose
+    .family<SeriesContentData, String>((ref, seriesId) async {
+      final repository = ref.watch(seriesRepositoryProvider);
+      final seriesFuture = repository.getSeriesById(seriesId);
+      final episodesFuture = repository.getEpisodes(seriesId);
+
+      return SeriesContentData(
+        series: await seriesFuture,
+        episodes: await episodesFuture,
+      );
+    });
 
 final seriesDetailsProvider = FutureProvider.autoDispose
     .family<SeriesDetailsData, String>((ref, seriesId) async {
-      final repository = ref.watch(seriesRepositoryProvider);
       final watchSystemRepository = ref.watch(watchSystemRepositoryProvider);
-      final seriesFuture = repository.getSeriesById(seriesId);
-      final episodesFuture = repository.getEpisodes(seriesId);
-      final progressFuture = watchSystemRepository.getSeriesEpisodeProgress(
-        seriesId: seriesId,
+      final contentFuture = ref.watch(seriesContentProvider(seriesId).future);
+      String? watchStateErrorMessage;
+      final progressFuture =
+          Future<List<EpisodeProgress>>.sync(
+            () => watchSystemRepository.getSeriesEpisodeProgress(
+              seriesId: seriesId,
+            ),
+          ).catchError((Object error, StackTrace stackTrace) {
+            watchStateErrorMessage ??= error.toString();
+            return <EpisodeProgress>[];
+          });
+
+      final content = await contentFuture;
+      final episodeProgressById = <String, EpisodeProgress>{};
+      final progressEntries = await progressFuture;
+      episodeProgressById.addEntries(
+        progressEntries.map(
+          (progress) => MapEntry(progress.episodeId, progress),
+        ),
       );
 
-      final progressEntries = await progressFuture;
-      final episodeProgressById = <String, EpisodeProgress>{
-        for (final progress in progressEntries) progress.episodeId: progress,
-      };
-
       return SeriesDetailsData(
-        series: await seriesFuture,
-        episodes: await episodesFuture,
+        series: content.series,
+        episodes: content.episodes,
         episodeProgressById: episodeProgressById,
+        watchStateErrorMessage: watchStateErrorMessage,
       );
     });

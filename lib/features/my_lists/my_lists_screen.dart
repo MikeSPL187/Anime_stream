@@ -8,9 +8,9 @@ import '../../app/router/app_router.dart';
 import '../../app/series/series_providers.dart';
 import '../../app/watchlist/watchlist_providers.dart';
 import '../../domain/models/download_entry.dart';
-import '../../domain/models/episode.dart';
 import '../../domain/models/history_entry.dart';
 import '../../domain/models/watchlist_entry.dart';
+import '../../domain/models/watchlist_snapshot.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
 import '../../shared/widgets/media_overlay_pill.dart';
 
@@ -22,6 +22,34 @@ class MyListsScreen extends ConsumerWidget {
     final watchlist = ref.watch(watchlistProvider);
     final history = ref.watch(watchHistoryProvider);
     final downloads = ref.watch(downloadsListProvider);
+    Future<void> refreshMyLists() async {
+      ref.invalidate(watchlistProvider);
+      ref.invalidate(watchHistoryProvider);
+      ref.invalidate(downloadsListProvider);
+      await Future.wait<Object?>([
+        () async {
+          try {
+            await ref.read(watchlistProvider.future);
+          } catch (_) {
+            return null;
+          }
+        }(),
+        () async {
+          try {
+            await ref.read(watchHistoryProvider.future);
+          } catch (_) {
+            return null;
+          }
+        }(),
+        () async {
+          try {
+            await ref.read(downloadsListProvider.future);
+          } catch (_) {
+            return null;
+          }
+        }(),
+      ]);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -39,21 +67,25 @@ class MyListsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-        children: [
-          _SummaryStrip(
-            watchlistCount: watchlist.asData?.value.length,
-            downloadsCount: downloads.asData?.value.length,
-            historyCount: history.asData?.value.length,
-          ),
-          const SizedBox(height: 22),
-          _WatchlistSection(watchlist: watchlist),
-          const SizedBox(height: 26),
-          _DownloadsSection(downloads: downloads),
-          const SizedBox(height: 26),
-          _HistorySection(history: history),
-        ],
+      body: RefreshIndicator(
+        onRefresh: refreshMyLists,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          children: [
+            _SummaryStrip(
+              watchlistCount: watchlist.asData?.value.totalSavedCount,
+              downloadsCount: downloads.asData?.value.length,
+              historyCount: history.asData?.value.length,
+            ),
+            const SizedBox(height: 22),
+            _WatchlistSection(watchlist: watchlist),
+            const SizedBox(height: 26),
+            _DownloadsSection(downloads: downloads),
+            const SizedBox(height: 26),
+            _HistorySection(history: history),
+          ],
+        ),
       ),
     );
   }
@@ -87,7 +119,7 @@ class _SummaryStrip extends StatelessWidget {
         _CountBadge(
           label: downloadsCount == null
               ? 'Downloads…'
-              : '${downloadsCount!} offline',
+              : '${downloadsCount!} downloads',
           color: colorScheme.secondary,
         ),
         _CountBadge(
@@ -102,7 +134,7 @@ class _SummaryStrip extends StatelessWidget {
 class _WatchlistSection extends StatelessWidget {
   const _WatchlistSection({required this.watchlist});
 
-  final AsyncValue<List<WatchlistEntry>> watchlist;
+  final AsyncValue<WatchlistSnapshot> watchlist;
 
   @override
   Widget build(BuildContext context) {
@@ -115,13 +147,13 @@ class _WatchlistSection extends StatelessWidget {
         title: 'Watchlist',
         message: 'Saved titles could not be loaded.\n$error',
       ),
-      data: (entries) => Column(
+      data: (snapshot) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
             title: 'Watchlist',
             subtitle: 'Saved-for-later series outside active playback.',
-            trailing: entries.isEmpty
+            trailing: snapshot.totalSavedCount == 0
                 ? null
                 : TextButton(
                     onPressed: () => context.push(AppRoutePaths.watchlist),
@@ -129,23 +161,45 @@ class _WatchlistSection extends StatelessWidget {
                   ),
           ),
           const SizedBox(height: 12),
-          if (entries.isEmpty)
+          if (snapshot.isEmpty)
             const _SectionMessage(
               title: 'Nothing saved yet',
               message:
                   'Add titles from a series page to keep them here for later.',
             )
+          else if (snapshot.entries.isEmpty)
+            _SectionMessage(
+              title: 'Saved titles temporarily unavailable',
+              message: snapshot.temporarilyUnavailableCount == 1
+                  ? '1 saved title could not be loaded right now. It stays in Watchlist and can return after a refresh.'
+                  : '${snapshot.temporarilyUnavailableCount} saved titles could not be loaded right now. They stay in Watchlist and can return after a refresh.',
+            )
           else
-            SizedBox(
-              height: 244,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: entries.take(4).length,
-                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  return _WatchlistCard(entry: entries[index]);
-                },
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (snapshot.hasTemporarilyUnavailableEntries) ...[
+                  _SectionMessage(
+                    title: 'Some saved titles are unavailable',
+                    message: snapshot.temporarilyUnavailableCount == 1
+                        ? '1 saved title could not be loaded right now. The rest of Watchlist still stays available below.'
+                        : '${snapshot.temporarilyUnavailableCount} saved titles could not be loaded right now. The rest of Watchlist still stays available below.',
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                SizedBox(
+                  height: 244,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: snapshot.entries.take(4).length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      return _WatchlistCard(entry: snapshot.entries[index]);
+                    },
+                  ),
+                ),
+              ],
             ),
         ],
       ),
@@ -174,7 +228,7 @@ class _DownloadsSection extends StatelessWidget {
         children: [
           _SectionHeader(
             title: 'Downloads',
-            subtitle: 'Offline-ready and active download entries.',
+            subtitle: 'Verified offline copies and active download entries.',
             trailing: entries.isEmpty
                 ? null
                 : TextButton(
@@ -314,17 +368,15 @@ class _DownloadPreviewCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final details = ref.watch(seriesDetailsProvider(entry.seriesId));
-    return details.when(
+    final content = ref.watch(seriesContentProvider(entry.seriesId));
+    return content.when(
       loading: () => _MediaShelfCard(
         imageUrl: null,
         title: entry.seriesId,
         subtitle: 'Episode ${entry.episodeId}',
         metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
-        pillLabel: 'Downloads',
-        pillIcon: entry.isPlayableOffline
-            ? Icons.offline_pin_rounded
-            : Icons.download_rounded,
+        pillLabel: _downloadPillLabel(entry),
+        pillIcon: _downloadPillIcon(entry),
         onTap: () => context.push(AppRoutePaths.downloads),
       ),
       error: (error, stackTrace) => _MediaShelfCard(
@@ -332,26 +384,22 @@ class _DownloadPreviewCard extends ConsumerWidget {
         title: entry.seriesId,
         subtitle: 'Episode ${entry.episodeId}',
         metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
-        pillLabel: 'Downloads',
-        pillIcon: entry.isPlayableOffline
-            ? Icons.offline_pin_rounded
-            : Icons.download_rounded,
+        pillLabel: _downloadPillLabel(entry),
+        pillIcon: _downloadPillIcon(entry),
         onTap: () => context.push(AppRoutePaths.downloads),
       ),
-      data: (details) {
-        final episode = _findEpisode(details.episodes, entry.episodeId);
+      data: (content) {
+        final episode = content.episodeById(entry.episodeId);
         final episodeLabel = episode == null
             ? 'Episode ${entry.episodeId}'
             : 'Episode ${episode.numberLabel}';
         return _MediaShelfCard(
-          imageUrl: details.series.posterImageUrl,
-          title: details.series.title,
+          imageUrl: content.series.posterImageUrl,
+          title: content.series.title,
           subtitle: episodeLabel,
           metadata: '${entry.selectedQuality} • ${_downloadStatusLabel(entry)}',
-          pillLabel: entry.isPlayableOffline ? 'Offline ready' : 'Downloads',
-          pillIcon: entry.isPlayableOffline
-              ? Icons.offline_pin_rounded
-              : Icons.download_rounded,
+          pillLabel: _downloadPillLabel(entry),
+          pillIcon: _downloadPillIcon(entry),
           onTap: () => context.push(AppRoutePaths.downloads),
         );
       },
@@ -588,25 +636,48 @@ class _CountBadge extends StatelessWidget {
   }
 }
 
-Episode? _findEpisode(List<Episode> episodes, String episodeId) {
-  for (final episode in episodes) {
-    if (episode.id == episodeId) {
-      return episode;
-    }
-  }
-  return null;
-}
-
 String _downloadStatusLabel(DownloadEntry entry) {
   return switch (entry.status) {
     DownloadStatus.completed when entry.isPlayableOffline =>
       'Available offline',
     DownloadStatus.completed => 'Downloaded',
     DownloadStatus.downloading => 'Downloading',
-    DownloadStatus.queued => 'Queued',
-    DownloadStatus.paused => 'Paused',
-    DownloadStatus.failed => 'Failed',
+    DownloadStatus.queued || DownloadStatus.paused => 'Restart needed',
+    DownloadStatus.failed when entry.requiresOfflineRestore => 'Restore needed',
+    DownloadStatus.failed when _downloadNeedsRestart(entry) => 'Restart needed',
+    DownloadStatus.failed => 'Retry needed',
   };
+}
+
+String _downloadPillLabel(DownloadEntry entry) {
+  return switch (entry.status) {
+    DownloadStatus.completed when entry.isPlayableOffline => 'Offline ready',
+    DownloadStatus.failed when entry.requiresOfflineRestore => 'Restore needed',
+    DownloadStatus.downloading => 'Downloading',
+    DownloadStatus.queued || DownloadStatus.paused => 'Restart needed',
+    DownloadStatus.failed when _downloadNeedsRestart(entry) => 'Restart needed',
+    _ => 'Downloads',
+  };
+}
+
+IconData _downloadPillIcon(DownloadEntry entry) {
+  return switch (entry.status) {
+    DownloadStatus.completed when entry.isPlayableOffline =>
+      Icons.offline_pin_rounded,
+    DownloadStatus.failed when entry.requiresOfflineRestore =>
+      Icons.warning_amber_rounded,
+    DownloadStatus.downloading => Icons.download_rounded,
+    DownloadStatus.queued || DownloadStatus.paused => Icons.restart_alt_rounded,
+    DownloadStatus.failed when _downloadNeedsRestart(entry) =>
+      Icons.restart_alt_rounded,
+    _ => Icons.download_rounded,
+  };
+}
+
+bool _downloadNeedsRestart(DownloadEntry entry) {
+  return entry.failureKind == DownloadFailureKind.transferInterrupted ||
+      entry.status == DownloadStatus.queued ||
+      entry.status == DownloadStatus.paused;
 }
 
 String _formatHistoryDate(DateTime watchedAt) {

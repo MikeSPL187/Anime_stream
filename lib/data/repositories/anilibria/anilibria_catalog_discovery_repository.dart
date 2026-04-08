@@ -8,15 +8,15 @@ class AniLibriaCatalogDiscoveryRepository
   AniLibriaCatalogDiscoveryRepository({
     required AnilibriaRemoteDataSource remoteDataSource,
     required AnilibriaSeriesMapper seriesMapper,
-  })  : _remoteDataSource = remoteDataSource,
-        _seriesMapper = seriesMapper;
+  }) : _remoteDataSource = remoteDataSource,
+       _seriesMapper = seriesMapper;
 
   final AnilibriaRemoteDataSource _remoteDataSource;
   final AnilibriaSeriesMapper _seriesMapper;
 
   @override
-  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
-    final releases = await _remoteDataSource.fetchFeaturedReleases(limit: limit);
+  Future<List<Series>> getLatestSeries({int limit = 20}) async {
+    final releases = await _remoteDataSource.fetchLatestReleases(limit: limit);
     return releases.map(_seriesMapper.mapRelease).toList();
   }
 
@@ -28,7 +28,9 @@ class AniLibriaCatalogDiscoveryRepository
 
   @override
   Future<List<Series>> getTrendingSeries({int limit = 20}) async {
-    final releases = await _remoteDataSource.fetchTrendingReleases(limit: limit);
+    final releases = await _remoteDataSource.fetchTrendingReleases(
+      limit: limit,
+    );
     return releases.map(_seriesMapper.mapRelease).toList();
   }
 }

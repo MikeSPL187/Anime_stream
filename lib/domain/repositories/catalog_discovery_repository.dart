@@ -4,7 +4,7 @@ import '../models/series.dart';
   'Use SeriesRepository for stable product-facing series discovery contracts.',
 )
 abstract interface class CatalogDiscoveryRepository {
-  Future<List<Series>> getFeaturedSeries({int limit = 20});
+  Future<List<Series>> getLatestSeries({int limit = 20});
 
   Future<List<Series>> getTrendingSeries({int limit = 20});
 

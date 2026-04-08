@@ -1,8 +1,11 @@
+import 'package:dio/dio.dart';
+
 import '../../../domain/models/episode.dart';
 import '../../../domain/models/series_catalog_page.dart';
 import '../../../domain/models/series.dart';
 import '../../../domain/repositories/series_repository.dart';
 import '../../adapters/anilibria/anilibria_remote_data_source.dart';
+import '../../dto/anilibria/anilibria_release_dto.dart';
 import '../../mappers/anilibria/anilibria_episode_mapper.dart';
 import '../../mappers/anilibria/anilibria_series_mapper.dart';
 
@@ -18,12 +21,11 @@ class AniLibriaSeriesRepository implements SeriesRepository {
   final AnilibriaRemoteDataSource _remoteDataSource;
   final AnilibriaSeriesMapper _seriesMapper;
   final AnilibriaEpisodeMapper _episodeMapper;
+  final Map<String, Future<AnilibriaReleaseDto>> _releaseRequestById = {};
 
   @override
-  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
-    final releases = await _remoteDataSource.fetchFeaturedReleases(
-      limit: limit,
-    );
+  Future<List<Series>> getLatestSeries({int limit = 20}) async {
+    final releases = await _remoteDataSource.fetchLatestReleases(limit: limit);
     return releases.map(_seriesMapper.mapRelease).toList(growable: false);
   }
 
@@ -88,18 +90,46 @@ class AniLibriaSeriesRepository implements SeriesRepository {
 
   @override
   Future<Series> getSeriesById(String seriesId) async {
-    final release = await _remoteDataSource.fetchReleaseDetails(seriesId);
+    final release = await _loadRelease(seriesId);
     return _seriesMapper.mapRelease(release);
   }
 
   @override
   Future<List<Episode>> getEpisodes(String seriesId) async {
-    final episodes = await _remoteDataSource.fetchReleaseEpisodes(seriesId);
-    return episodes
+    final release = await _loadRelease(seriesId);
+    return release.episodes
         .map(
           (episode) =>
               _episodeMapper.mapEpisode(dto: episode, seriesId: seriesId),
         )
         .toList(growable: false);
+  }
+
+  Future<AnilibriaReleaseDto> _loadRelease(String seriesId) {
+    final inflightRequest = _releaseRequestById[seriesId];
+    if (inflightRequest != null) {
+      return inflightRequest;
+    }
+
+    late final Future<AnilibriaReleaseDto> trackedRequest;
+    trackedRequest = _fetchReleaseDetails(seriesId).whenComplete(() {
+      if (identical(_releaseRequestById[seriesId], trackedRequest)) {
+        _releaseRequestById.remove(seriesId);
+      }
+    });
+
+    _releaseRequestById[seriesId] = trackedRequest;
+    return trackedRequest;
+  }
+
+  Future<AnilibriaReleaseDto> _fetchReleaseDetails(String seriesId) async {
+    try {
+      return await _remoteDataSource.fetchReleaseDetails(seriesId);
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        throw StateError('Series $seriesId is unavailable.');
+      }
+      rethrow;
+    }
   }
 }

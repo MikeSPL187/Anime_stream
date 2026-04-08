@@ -66,9 +66,13 @@ class _BrowseContent extends StatelessWidget {
     );
 
     if (!catalog.hasAnyContent) {
-      return const _BrowseMessageState(
-        title: 'Nothing surfaced yet',
-        message: 'No browse slices are available right now.',
+      return _BrowseMessageState(
+        title: catalog.hasAnyUnavailableSlice
+            ? 'Browse is limited right now'
+            : 'Nothing surfaced yet',
+        message: catalog.hasAnyUnavailableSlice
+            ? 'Available browse slices are empty and some discovery sections could not be loaded.'
+            : 'No browse slices are available right now.',
         icon: Icons.explore_outlined,
       );
     }
@@ -111,9 +115,21 @@ class _BrowseContent extends StatelessWidget {
   }
 
   List<_BrowseSection> _sections(BrowseCatalogData catalog) => [
-    _BrowseSection(title: 'Latest', seriesList: catalog.latestReleases),
-    _BrowseSection(title: 'Trending', seriesList: catalog.trendingSeries),
-    _BrowseSection(title: 'Popular', seriesList: catalog.popularSeries),
+    _BrowseSection(
+      title: 'Latest',
+      seriesList: catalog.latestReleases,
+      errorMessage: catalog.latestError,
+    ),
+    _BrowseSection(
+      title: 'Trending',
+      seriesList: catalog.trendingSeries,
+      errorMessage: catalog.trendingError,
+    ),
+    _BrowseSection(
+      title: 'Popular',
+      seriesList: catalog.popularSeries,
+      errorMessage: catalog.popularError,
+    ),
   ];
 }
 
@@ -259,8 +275,12 @@ class _BrowseSectionView extends StatelessWidget {
   Widget build(BuildContext context) {
     if (section.seriesList.isEmpty) {
       return _BrowseMessageState(
-        title: '${section.title} unavailable',
-        message: 'No anime is currently available in this slice.',
+        title: section.errorMessage == null
+            ? '${section.title} unavailable'
+            : '${section.title} could not load',
+        message: section.errorMessage == null
+            ? 'No anime is currently available in this slice.'
+            : 'This discovery slice could not be loaded right now.',
         icon: Icons.explore_outlined,
       );
     }
@@ -458,8 +478,13 @@ class _OverlayPill extends StatelessWidget {
 }
 
 class _BrowseSection {
-  const _BrowseSection({required this.title, required this.seriesList});
+  const _BrowseSection({
+    required this.title,
+    required this.seriesList,
+    this.errorMessage,
+  });
 
   final String title;
   final List<Series> seriesList;
+  final String? errorMessage;
 }

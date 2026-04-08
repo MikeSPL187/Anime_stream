@@ -25,21 +25,114 @@ class SeriesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final seriesDetails = ref.watch(seriesDetailsProvider(seriesId));
 
+    Future<void> refreshDetails() async {
+      ref.invalidate(seriesContentProvider(seriesId));
+      ref.invalidate(seriesDetailsProvider(seriesId));
+      ref.invalidate(watchlistMembershipControllerProvider(seriesId));
+      ref.invalidate(downloadsListProvider);
+      try {
+        await ref.read(seriesDetailsProvider(seriesId).future);
+      } catch (_) {
+        return;
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Series')),
       body: seriesDetails.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Failed to load series $seriesId.\n$error',
-              textAlign: TextAlign.center,
+        loading: () => const _SeriesHubState(
+          icon: Icons.live_tv_rounded,
+          title: 'Loading series',
+          message: 'Preparing this watch hub.',
+          child: CircularProgressIndicator(),
+        ),
+        error: (error, stackTrace) => _SeriesHubState(
+          icon: Icons.error_outline_rounded,
+          title: 'Series unavailable',
+          message: 'This series could not be loaded right now.',
+          actions: [
+            FilledButton.icon(
+              onPressed: refreshDetails,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry'),
+            ),
+            TextButton.icon(
+              onPressed: () => context.go(AppRoutePaths.browse),
+              icon: const Icon(Icons.explore_outlined),
+              label: const Text('Open Browse'),
+            ),
+          ],
+        ),
+        data: (details) => RefreshIndicator(
+          onRefresh: refreshDetails,
+          child: _SeriesPage(details: details),
+        ),
+      ),
+    );
+  }
+}
+
+class _SeriesHubState extends StatelessWidget {
+  const _SeriesHubState({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.child,
+    this.actions = const [],
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Widget? child;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 420),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (child != null) ...[
+                    child!,
+                    const SizedBox(height: 20),
+                  ] else ...[
+                    Icon(icon, size: 40, color: theme.colorScheme.primary),
+                    const SizedBox(height: 20),
+                  ],
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (actions.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Wrap(spacing: 8, runSpacing: 8, children: actions),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
-        data: (details) => _SeriesPage(details: details),
-      ),
+      ],
     );
   }
 }
@@ -54,11 +147,16 @@ class _SeriesPage extends StatelessWidget {
     final series = details.series;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
         _SeriesHero(details: details),
         const SizedBox(height: 16),
         _PrimaryWatchPanel(details: details),
+        if (!details.isWatchStateAvailable) ...[
+          const SizedBox(height: 16),
+          const _WatchStateNotice(),
+        ],
         const SizedBox(height: 22),
         _SaveIntentSection(series: series),
         const SizedBox(height: 22),
@@ -87,19 +185,21 @@ class _SeriesHero extends StatelessWidget {
       if (series.genres.isNotEmpty) series.genres.take(2).join(' • '),
       '${details.episodes.length} episodes',
     ].join(' • ');
-    final progressSummary = switch ((
-      details.inProgressEpisodeCount,
-      details.completedEpisodeCount,
-    )) {
-      (0, 0) => 'No watch activity yet',
-      (final inProgress, final completed)
-          when inProgress > 0 && completed > 0 =>
-        '$inProgress in progress • $completed completed',
-      (final inProgress, 0) when inProgress > 0 =>
-        '$inProgress episode in progress',
-      (0, final completed) when completed > 0 => '$completed completed',
-      _ => 'Watch state available',
-    };
+    final progressSummary = !details.isWatchStateAvailable
+        ? 'Watch activity unavailable'
+        : switch ((
+            details.inProgressEpisodeCount,
+            details.completedEpisodeCount,
+          )) {
+            (0, 0) => 'No watch activity yet',
+            (final inProgress, final completed)
+                when inProgress > 0 && completed > 0 =>
+              '$inProgress in progress • $completed completed',
+            (final inProgress, 0) when inProgress > 0 =>
+              '$inProgress episode in progress',
+            (0, final completed) when completed > 0 => '$completed completed',
+            _ => 'Watch state available',
+          };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,39 +320,55 @@ class _PrimaryWatchPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final action = details.primaryWatchAction;
     final targetEpisode = action.targetEpisode;
-    final supportingText = switch (action.kind) {
-      SeriesPrimaryWatchActionKind.resumeEpisode when targetEpisode != null =>
-        'Continue from Episode ${targetEpisode.numberLabel} • ${targetEpisode.title}',
-      SeriesPrimaryWatchActionKind.continueEpisode when targetEpisode != null =>
-        'Up next: Episode ${targetEpisode.numberLabel} • ${targetEpisode.title}',
-      SeriesPrimaryWatchActionKind.startWatching when targetEpisode != null =>
-        'Begin with Episode ${targetEpisode.numberLabel} • ${targetEpisode.title}',
-      SeriesPrimaryWatchActionKind.endOfAvailableContent =>
-        'Every currently available episode is complete.',
-      SeriesPrimaryWatchActionKind.unavailable =>
-        'Episodes are not available yet.',
-      _ => 'A playable episode is not available yet.',
-    };
-    final activityText = switch ((
-      details.latestProgress,
-      details.latestProgress == null
-          ? null
-          : details.episodeForProgress(details.latestProgress!),
-    )) {
-      (final progress?, final episode?) when progress.isCompleted =>
-        'Latest activity: completed Episode ${episode.numberLabel}',
-      (final progress?, final episode?) =>
-        'Latest activity: Episode ${episode.numberLabel} at ${_formatPlaybackPosition(progress.position)}',
-      _ => 'Choose a specific episode below or start from the main action.',
-    };
+    final primaryActionLabel =
+        !details.isWatchStateAvailable && targetEpisode != null
+        ? 'Play Episode ${targetEpisode.numberLabel}'
+        : action.label;
+    final supportingText = !details.isWatchStateAvailable
+        ? targetEpisode == null
+              ? 'Watch activity is unavailable right now and no playable episode is ready yet.'
+              : 'Watch activity is unavailable right now. Start from Episode ${targetEpisode.numberLabel} or refresh to restore resume state.'
+        : switch (action.kind) {
+            SeriesPrimaryWatchActionKind.resumeEpisode
+                when targetEpisode != null =>
+              'Continue from Episode ${targetEpisode.numberLabel} • ${targetEpisode.title}',
+            SeriesPrimaryWatchActionKind.continueEpisode
+                when targetEpisode != null =>
+              'Up next: Episode ${targetEpisode.numberLabel} • ${targetEpisode.title}',
+            SeriesPrimaryWatchActionKind.startWatching
+                when targetEpisode != null =>
+              'Begin with Episode ${targetEpisode.numberLabel} • ${targetEpisode.title}',
+            SeriesPrimaryWatchActionKind.endOfAvailableContent =>
+              'Every currently available episode is complete.',
+            SeriesPrimaryWatchActionKind.unavailable =>
+              'Episodes are not available yet.',
+            _ => 'A playable episode is not available yet.',
+          };
+    final activityText = !details.isWatchStateAvailable
+        ? 'Resume progress and watched markers could not be loaded right now.'
+        : switch ((
+            details.latestProgress,
+            details.latestProgress == null
+                ? null
+                : details.episodeForProgress(details.latestProgress!),
+          )) {
+            (final progress?, final episode?) when progress.isCompleted =>
+              'Latest activity: completed Episode ${episode.numberLabel}',
+            (final progress?, final episode?) =>
+              'Latest activity: Episode ${episode.numberLabel} at ${_formatPlaybackPosition(progress.position)}',
+            _ =>
+              'Choose a specific episode below or start from the main action.',
+          };
 
-    final stateLabel = switch (action.kind) {
-      SeriesPrimaryWatchActionKind.resumeEpisode => 'Resume',
-      SeriesPrimaryWatchActionKind.continueEpisode => 'Up next',
-      SeriesPrimaryWatchActionKind.startWatching => 'Start',
-      SeriesPrimaryWatchActionKind.endOfAvailableContent => 'Complete',
-      SeriesPrimaryWatchActionKind.unavailable => 'Unavailable',
-    };
+    final stateLabel = !details.isWatchStateAvailable
+        ? 'Playback'
+        : switch (action.kind) {
+            SeriesPrimaryWatchActionKind.resumeEpisode => 'Resume',
+            SeriesPrimaryWatchActionKind.continueEpisode => 'Up next',
+            SeriesPrimaryWatchActionKind.startWatching => 'Start',
+            SeriesPrimaryWatchActionKind.endOfAvailableContent => 'Complete',
+            SeriesPrimaryWatchActionKind.unavailable => 'Unavailable',
+          };
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -280,7 +396,7 @@ class _PrimaryWatchPanel extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              action.label,
+              primaryActionLabel,
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
                 height: 1.05,
@@ -323,7 +439,7 @@ class _PrimaryWatchPanel extends StatelessWidget {
                       Icons.check_circle_outline_rounded,
                     _ => Icons.play_arrow_rounded,
                   }),
-                  label: Text(action.label),
+                  label: Text(primaryActionLabel),
                 ),
                 TextButton.icon(
                   onPressed: () => context.push(AppRoutePaths.watchlist),
@@ -470,6 +586,42 @@ class _SaveIntentSection extends ConsumerWidget {
   }
 }
 
+class _WatchStateNotice extends StatelessWidget {
+  const _WatchStateNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Watch activity unavailable',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Resume progress and watched markers could not be loaded right now. You can still start playback and refresh this page to restore watch-state context.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SeriesDetailsSection extends StatelessWidget {
   const _SeriesDetailsSection({
     required this.series,
@@ -522,14 +674,29 @@ class _EpisodesSection extends StatefulWidget {
 }
 
 class _EpisodesSectionState extends State<_EpisodesSection> {
+  late final TextEditingController _episodeQueryController;
   _EpisodeListFilter _selectedFilter = _EpisodeListFilter.all;
   _EpisodeSortOrder _selectedSortOrder = _EpisodeSortOrder.oldestFirst;
+  String _episodeQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _episodeQueryController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _episodeQueryController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final details = widget.details;
     final series = details.series;
+    final watchStateAvailable = details.isWatchStateAvailable;
     final episodes = details.episodes;
     final sortedEpisodes = episodes.toList(growable: false)
       ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
@@ -540,8 +707,16 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
     final watchedCount = details.completedEpisodeCount;
     final unwatchedCount =
         sortedEpisodes.length - inProgressCount - watchedCount;
+    final effectiveFilter = watchStateAvailable
+        ? _selectedFilter
+        : _EpisodeListFilter.all;
+    final normalizedEpisodeQuery = _normalizeEpisodeFinderQuery(_episodeQuery);
     final visibleEpisodes = orderedEpisodes
-        .where((episode) => _matchesFilter(details, episode))
+        .where(
+          (episode) =>
+              _matchesFilter(details, episode, effectiveFilter) &&
+              _matchesEpisodeQuery(episode, normalizedEpisodeQuery),
+        )
         .toList(growable: false);
 
     return Column(
@@ -568,7 +743,38 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Primary play path stays first. Secondary actions move into the overflow menu.',
+          watchStateAvailable
+              ? 'Primary play path stays first. Secondary actions move into the overflow menu.'
+              : 'Watch activity filters are unavailable right now. Refresh to restore resume and watched states.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _episodeQueryController,
+          textInputAction: TextInputAction.search,
+          onChanged: (value) => setState(() => _episodeQuery = value),
+          decoration: InputDecoration(
+            hintText: 'Find an episode by number or title',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: normalizedEpisodeQuery.isEmpty
+                ? null
+                : IconButton(
+                    onPressed: () {
+                      _episodeQueryController.clear();
+                      setState(() => _episodeQuery = '');
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Clear episode filter',
+                  ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          normalizedEpisodeQuery.isEmpty
+              ? 'Jump into long runs faster by episode number or title.'
+              : 'Showing episodes matching "$normalizedEpisodeQuery".',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -581,38 +787,40 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
               _EpisodeFilterButton(
                 label: 'All',
                 count: sortedEpisodes.length,
-                isSelected: _selectedFilter == _EpisodeListFilter.all,
+                isSelected: effectiveFilter == _EpisodeListFilter.all,
                 onTap: () =>
                     setState(() => _selectedFilter = _EpisodeListFilter.all),
               ),
-              const SizedBox(width: 8),
-              _EpisodeFilterButton(
-                label: 'Continue',
-                count: inProgressCount,
-                isSelected:
-                    _selectedFilter == _EpisodeListFilter.continueWatching,
-                onTap: () => setState(
-                  () => _selectedFilter = _EpisodeListFilter.continueWatching,
+              if (watchStateAvailable) ...[
+                const SizedBox(width: 8),
+                _EpisodeFilterButton(
+                  label: 'Continue',
+                  count: inProgressCount,
+                  isSelected:
+                      effectiveFilter == _EpisodeListFilter.continueWatching,
+                  onTap: () => setState(
+                    () => _selectedFilter = _EpisodeListFilter.continueWatching,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _EpisodeFilterButton(
-                label: 'Unwatched',
-                count: unwatchedCount,
-                isSelected: _selectedFilter == _EpisodeListFilter.unwatched,
-                onTap: () => setState(
-                  () => _selectedFilter = _EpisodeListFilter.unwatched,
+                const SizedBox(width: 8),
+                _EpisodeFilterButton(
+                  label: 'Unwatched',
+                  count: unwatchedCount,
+                  isSelected: effectiveFilter == _EpisodeListFilter.unwatched,
+                  onTap: () => setState(
+                    () => _selectedFilter = _EpisodeListFilter.unwatched,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _EpisodeFilterButton(
-                label: 'Watched',
-                count: watchedCount,
-                isSelected: _selectedFilter == _EpisodeListFilter.watched,
-                onTap: () => setState(
-                  () => _selectedFilter = _EpisodeListFilter.watched,
+                const SizedBox(width: 8),
+                _EpisodeFilterButton(
+                  label: 'Watched',
+                  count: watchedCount,
+                  isSelected: effectiveFilter == _EpisodeListFilter.watched,
+                  onTap: () => setState(
+                    () => _selectedFilter = _EpisodeListFilter.watched,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -625,15 +833,18 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
         else if (visibleEpisodes.isEmpty)
           _InlineEpisodesState(
             title: 'Nothing in this filter',
-            message: switch (_selectedFilter) {
-              _EpisodeListFilter.all => 'No episodes are available right now.',
-              _EpisodeListFilter.continueWatching =>
-                'No episodes are currently in progress for this series.',
-              _EpisodeListFilter.unwatched =>
-                'Every available episode already has watch-state activity.',
-              _EpisodeListFilter.watched =>
-                'No episodes have been marked watched yet.',
-            },
+            message: normalizedEpisodeQuery.isNotEmpty
+                ? 'No episodes match "$normalizedEpisodeQuery" in this view.'
+                : switch (effectiveFilter) {
+                    _EpisodeListFilter.all =>
+                      'No episodes are available right now.',
+                    _EpisodeListFilter.continueWatching =>
+                      'No episodes are currently in progress for this series.',
+                    _EpisodeListFilter.unwatched =>
+                      'Every available episode already has watch-state activity.',
+                    _EpisodeListFilter.watched =>
+                      'No episodes have been marked watched yet.',
+                  },
           )
         else
           Column(
@@ -658,8 +869,12 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
     );
   }
 
-  bool _matchesFilter(SeriesDetailsData details, Episode episode) {
-    return switch (_selectedFilter) {
+  bool _matchesFilter(
+    SeriesDetailsData details,
+    Episode episode,
+    _EpisodeListFilter filter,
+  ) {
+    return switch (filter) {
       _EpisodeListFilter.all => true,
       _EpisodeListFilter.continueWatching => details.isEpisodeInProgress(
         episode.id,
@@ -669,10 +884,36 @@ class _EpisodesSectionState extends State<_EpisodesSection> {
     };
   }
 
+  bool _matchesEpisodeQuery(Episode episode, String normalizedQuery) {
+    if (normalizedQuery.isEmpty) {
+      return true;
+    }
+
+    final candidates = <String>[
+      _normalizeEpisodeFinderQuery(episode.numberLabel),
+      _normalizeEpisodeFinderQuery('episode ${episode.numberLabel}'),
+      _normalizeEpisodeFinderQuery(episode.title),
+      _normalizeEpisodeFinderQuery('${episode.numberLabel} ${episode.title}'),
+      _normalizeEpisodeFinderQuery('${episode.sortOrder}'),
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate.contains(normalizedQuery)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   _EpisodeActionHint? _episodeActionHint(
     SeriesDetailsData details,
     Episode episode,
   ) {
+    if (!details.isWatchStateAvailable) {
+      return null;
+    }
+
     final action = details.primaryWatchAction;
     final targetEpisode = action.targetEpisode;
     if (targetEpisode == null || targetEpisode.id != episode.id) {
@@ -834,7 +1075,7 @@ class _EpisodeRow extends ConsumerWidget {
       DownloadStatus.failed => _EpisodeRowMenuAction.retryDownload,
       DownloadStatus.paused => _EpisodeRowMenuAction.retryDownload,
       DownloadStatus.downloading => _EpisodeRowMenuAction.downloadInProgress,
-      DownloadStatus.queued => _EpisodeRowMenuAction.downloadInProgress,
+      DownloadStatus.queued => _EpisodeRowMenuAction.retryDownload,
       null => _EpisodeRowMenuAction.downloadEpisode,
     };
 
@@ -1152,8 +1393,10 @@ String _buildCompactStatus({
       'Offline'
     else if (downloadEntry?.status == DownloadStatus.downloading)
       'Downloading'
-    else if (downloadEntry?.status == DownloadStatus.queued)
-      'Queued'
+    else if (downloadEntry?.status == DownloadStatus.queued ||
+        downloadEntry?.status == DownloadStatus.paused ||
+        downloadEntry?.failureKind == DownloadFailureKind.transferInterrupted)
+      'Retry download'
     else if (downloadEntry?.status == DownloadStatus.failed)
       'Download failed',
     if (episode.isRecap) 'Recap' else if (episode.isFiller) 'Filler',
@@ -1263,6 +1506,14 @@ enum _EpisodeRowMenuAction {
   const _EpisodeRowMenuAction(this.label);
 
   final String label;
+}
+
+String _normalizeEpisodeFinderQuery(String rawValue) {
+  return rawValue
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9а-яё ]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ');
 }
 
 String _formatPlaybackPosition(Duration duration) {

@@ -23,6 +23,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
   final AnilibriaRemoteDataSource _remoteDataSource;
   final Dio _dio;
   final Future<Directory> Function() _downloadsRootDirectoryProvider;
+  final Set<String> _activeDownloadIds = <String>{};
 
   @override
   Future<List<DownloadEntry>> getDownloads() async {
@@ -63,49 +64,12 @@ class LocalDownloadsRepository implements DownloadsRepository {
   }
 
   @override
-  Future<void> queueEpisodeDownload({
-    required String seriesId,
-    required String episodeId,
-    String selectedQuality = '1080p',
-  }) async {
-    final storedEntries = Map<String, dynamic>.from(
-      await _downloadsStore.readAll(),
-    );
-    final key = _buildKey(
-      seriesId: seriesId,
-      episodeId: episodeId,
-      selectedQuality: selectedQuality,
-    );
-
-    final existingPayload = storedEntries[key];
-    final existingEntry = existingPayload is Map
-        ? DownloadEntry.fromJson(Map<String, dynamic>.from(existingPayload))
-        : null;
-
-    if (existingEntry?.isPlayableOffline == true) {
-      return;
-    }
-
-    final queuedEntry = DownloadEntry(
-      id: key,
-      seriesId: seriesId,
-      episodeId: episodeId,
-      selectedQuality: selectedQuality,
-      status: DownloadStatus.queued,
-      createdAt: existingEntry?.createdAt ?? DateTime.now(),
-      sourceKind: DownloadSourceKind.localHlsManifest,
-    );
-
-    storedEntries[key] = queuedEntry.toJson();
-    await _downloadsStore.writeAll(storedEntries);
-  }
-
-  @override
   Future<DownloadEntry> startEpisodeDownload({
     required String seriesId,
     required String episodeId,
     String selectedQuality = '1080p',
   }) async {
+    Directory? assetDirectory;
     final baseEntry = DownloadEntry(
       id: _buildKey(
         seriesId: seriesId,
@@ -119,6 +83,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
       createdAt: DateTime.now(),
       sourceKind: DownloadSourceKind.localHlsManifest,
     );
+    _activeDownloadIds.add(baseEntry.id);
     await _writeEntry(baseEntry);
 
     try {
@@ -140,7 +105,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
         );
       }
 
-      final assetDirectory = await _resolveAssetDirectory(
+      assetDirectory = await _resolveAssetDirectory(
         seriesId: seriesId,
         episodeId: episodeId,
         qualityLabel: resolvedStream.qualityLabel,
@@ -175,35 +140,17 @@ class LocalDownloadsRepository implements DownloadsRepository {
       await _writeEntry(completedEntry, removeKey: baseEntry.id);
       return completedEntry;
     } catch (error) {
+      await _deleteManagedDirectoryIfPresent(assetDirectory);
       final failedEntry = baseEntry.copyWith(
         status: DownloadStatus.failed,
         lastError: error.toString(),
+        failureKind: DownloadFailureKind.transferFailed,
       );
       await _writeEntry(failedEntry);
       rethrow;
+    } finally {
+      _activeDownloadIds.remove(baseEntry.id);
     }
-  }
-
-  @override
-  Future<void> pauseDownload(String downloadId) async {
-    final storedEntries = Map<String, dynamic>.from(
-      await _downloadsStore.readAll(),
-    );
-    final payload = storedEntries[downloadId];
-    if (payload is! Map) {
-      return;
-    }
-
-    final entry = DownloadEntry.fromJson(Map<String, dynamic>.from(payload));
-    if (entry.status != DownloadStatus.downloading &&
-        entry.status != DownloadStatus.queued) {
-      return;
-    }
-
-    storedEntries[downloadId] = entry
-        .copyWith(status: DownloadStatus.paused)
-        .toJson();
-    await _downloadsStore.writeAll(storedEntries);
   }
 
   @override
@@ -216,10 +163,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
       final entry = DownloadEntry.fromJson(Map<String, dynamic>.from(payload));
       final storageDirectoryPath = entry.storageDirectoryPath?.trim();
       if (storageDirectoryPath != null && storageDirectoryPath.isNotEmpty) {
-        final directory = Directory(storageDirectoryPath);
-        if (await directory.exists()) {
-          await directory.delete(recursive: true);
-        }
+        await _deleteManagedDirectoryIfPresent(Directory(storageDirectoryPath));
       }
     }
 
@@ -491,6 +435,30 @@ class LocalDownloadsRepository implements DownloadsRepository {
   Future<_NormalizedDownloadEntry> _normalizeStoredEntry(
     DownloadEntry entry,
   ) async {
+    if (entry.status == DownloadStatus.queued ||
+        entry.status == DownloadStatus.paused) {
+      return _NormalizedDownloadEntry(
+        entry: _buildStaleFailureEntry(
+          entry,
+          'Download was interrupted before completion. Start it again to save this episode offline.',
+          DownloadFailureKind.transferInterrupted,
+        ),
+        changed: true,
+      );
+    }
+
+    if (entry.status == DownloadStatus.downloading &&
+        !_activeDownloadIds.contains(entry.id)) {
+      return _NormalizedDownloadEntry(
+        entry: _buildStaleFailureEntry(
+          entry,
+          'Download was interrupted before completion. Start it again to save this episode offline.',
+          DownloadFailureKind.transferInterrupted,
+        ),
+        changed: true,
+      );
+    }
+
     if (!entry.isPlayableOffline) {
       return _NormalizedDownloadEntry(entry: entry, changed: false);
     }
@@ -501,6 +469,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
         entry: _buildStaleFailureEntry(
           entry,
           'Offline asset reference is missing.',
+          DownloadFailureKind.offlineAssetInvalid,
         ),
         changed: true,
       );
@@ -512,6 +481,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
         entry: _buildStaleFailureEntry(
           entry,
           'Offline asset reference is invalid.',
+          DownloadFailureKind.offlineAssetInvalid,
         ),
         changed: true,
       );
@@ -523,6 +493,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
         entry: _buildStaleFailureEntry(
           entry,
           'Offline asset is missing on device.',
+          DownloadFailureKind.offlineAssetMissing,
         ),
         changed: true,
       );
@@ -532,7 +503,11 @@ class LocalDownloadsRepository implements DownloadsRepository {
       final fileLength = await assetFile.length();
       if (fileLength <= 0) {
         return _NormalizedDownloadEntry(
-          entry: _buildStaleFailureEntry(entry, 'Offline asset is empty.'),
+          entry: _buildStaleFailureEntry(
+            entry,
+            'Offline asset is empty.',
+            DownloadFailureKind.offlineAssetCorrupted,
+          ),
           changed: true,
         );
       }
@@ -541,6 +516,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
         entry: _buildStaleFailureEntry(
           entry,
           'Offline asset could not be inspected.',
+          DownloadFailureKind.offlineAssetCorrupted,
         ),
         changed: true,
       );
@@ -553,6 +529,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
           entry: _buildStaleFailureEntry(
             entry,
             'Offline package directory is missing.',
+            DownloadFailureKind.offlinePackageMissing,
           ),
           changed: true,
         );
@@ -564,6 +541,36 @@ class LocalDownloadsRepository implements DownloadsRepository {
           entry: _buildStaleFailureEntry(
             entry,
             'Offline package directory is missing on device.',
+            DownloadFailureKind.offlinePackageMissing,
+          ),
+          changed: true,
+        );
+      }
+
+      if (!_isPathWithinDirectory(
+        candidatePath: assetFile.path,
+        directory: assetDirectory,
+      )) {
+        return _NormalizedDownloadEntry(
+          entry: _buildStaleFailureEntry(
+            entry,
+            'Offline package manifest is outside the download directory.',
+            DownloadFailureKind.offlinePackageCorrupted,
+          ),
+          changed: true,
+        );
+      }
+
+      final packageValidationFailure = await _validatePackagedHlsManifest(
+        manifestFile: assetFile,
+        assetDirectory: assetDirectory,
+      );
+      if (packageValidationFailure != null) {
+        return _NormalizedDownloadEntry(
+          entry: _buildStaleFailureEntry(
+            entry,
+            packageValidationFailure.reason,
+            packageValidationFailure.failureKind,
           ),
           changed: true,
         );
@@ -573,7 +580,187 @@ class LocalDownloadsRepository implements DownloadsRepository {
     return _NormalizedDownloadEntry(entry: entry, changed: false);
   }
 
-  DownloadEntry _buildStaleFailureEntry(DownloadEntry entry, String reason) {
+  Future<_OfflinePackageValidationFailure?> _validatePackagedHlsManifest({
+    required File manifestFile,
+    required Directory assetDirectory,
+  }) async {
+    final manifestBody = await _readOfflineManifest(manifestFile);
+    if (manifestBody == null) {
+      return const _OfflinePackageValidationFailure(
+        reason: 'Offline package manifest could not be read.',
+        failureKind: DownloadFailureKind.offlinePackageCorrupted,
+      );
+    }
+
+    final references = <String>[];
+    for (final rawLine in manifestBody.split('\n')) {
+      final trimmedLine = rawLine.trim();
+      if (trimmedLine.isEmpty) {
+        continue;
+      }
+
+      if (!trimmedLine.startsWith('#')) {
+        references.add(trimmedLine);
+        continue;
+      }
+
+      final taggedReference = _extractTaggedReference(rawLine);
+      if (taggedReference != null) {
+        references.add(taggedReference);
+      }
+    }
+
+    if (references.isEmpty) {
+      return const _OfflinePackageValidationFailure(
+        reason: 'Offline package has no media assets.',
+        failureKind: DownloadFailureKind.offlinePackageCorrupted,
+      );
+    }
+
+    for (final reference in references) {
+      final validationFailure = await _validatePackagedAssetReference(
+        reference: reference,
+        assetDirectory: assetDirectory,
+      );
+      if (validationFailure != null) {
+        return validationFailure;
+      }
+    }
+
+    return null;
+  }
+
+  Future<String?> _readOfflineManifest(File manifestFile) async {
+    try {
+      return await manifestFile.readAsString();
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  String? _extractTaggedReference(String rawLine) {
+    final uriMatch = RegExp(r'URI="([^"]+)"').firstMatch(rawLine);
+    final reference = uriMatch?.group(1)?.trim();
+    if (reference == null || reference.isEmpty) {
+      return null;
+    }
+    return reference;
+  }
+
+  Future<_OfflinePackageValidationFailure?> _validatePackagedAssetReference({
+    required String reference,
+    required Directory assetDirectory,
+  }) async {
+    final trimmedReference = reference.trim();
+    final referenceUri = Uri.tryParse(trimmedReference);
+    final hasInvalidStructure =
+        trimmedReference.isEmpty ||
+        trimmedReference.startsWith('/') ||
+        trimmedReference.startsWith('\\') ||
+        trimmedReference.startsWith('//') ||
+        referenceUri == null ||
+        referenceUri.hasScheme ||
+        referenceUri.hasQuery ||
+        referenceUri.fragment.isNotEmpty;
+    if (hasInvalidStructure) {
+      return const _OfflinePackageValidationFailure(
+        reason: 'Offline package contains an invalid local reference.',
+        failureKind: DownloadFailureKind.offlinePackageCorrupted,
+      );
+    }
+
+    final assetFile = File.fromUri(
+      assetDirectory.uri.resolve(trimmedReference),
+    );
+    if (!_isPathWithinDirectory(
+      candidatePath: assetFile.path,
+      directory: assetDirectory,
+    )) {
+      return const _OfflinePackageValidationFailure(
+        reason: 'Offline package contains an invalid local reference.',
+        failureKind: DownloadFailureKind.offlinePackageCorrupted,
+      );
+    }
+
+    if (!await assetFile.exists()) {
+      return const _OfflinePackageValidationFailure(
+        reason: 'Offline package asset is missing on device.',
+        failureKind: DownloadFailureKind.offlinePackageMissing,
+      );
+    }
+
+    try {
+      final assetLength = await assetFile.length();
+      if (assetLength <= 0) {
+        return const _OfflinePackageValidationFailure(
+          reason: 'Offline package asset is empty.',
+          failureKind: DownloadFailureKind.offlinePackageCorrupted,
+        );
+      }
+    } on FileSystemException {
+      return const _OfflinePackageValidationFailure(
+        reason: 'Offline package asset could not be inspected.',
+        failureKind: DownloadFailureKind.offlinePackageCorrupted,
+      );
+    }
+
+    return null;
+  }
+
+  Future<void> _deleteManagedDirectoryIfPresent(Directory? directory) async {
+    if (directory == null || !await directory.exists()) {
+      return;
+    }
+
+    if (!await _isManagedDownloadDirectory(directory)) {
+      return;
+    }
+
+    await directory.delete(recursive: true);
+  }
+
+  Future<bool> _isManagedDownloadDirectory(Directory directory) async {
+    final managedRoot = await _managedDownloadsRootDirectory();
+    final normalizedRootPath = _normalizePath(managedRoot.path);
+    final normalizedCandidatePath = _normalizePath(directory.path);
+    return normalizedCandidatePath.startsWith(
+      '$normalizedRootPath${Platform.pathSeparator}',
+    );
+  }
+
+  Future<Directory> _managedDownloadsRootDirectory() async {
+    final rootDirectory = await _downloadsRootDirectoryProvider();
+    return Directory('${rootDirectory.path}/downloads');
+  }
+
+  bool _isPathWithinDirectory({
+    required String candidatePath,
+    required Directory directory,
+  }) {
+    final normalizedDirectoryPath = _normalizePath(directory.path);
+    final normalizedCandidatePath = _normalizePath(candidatePath);
+    return normalizedCandidatePath.startsWith(
+      '$normalizedDirectoryPath${Platform.pathSeparator}',
+    );
+  }
+
+  String _normalizePath(String path) {
+    var normalizedPath = File(path).absolute.uri.normalizePath().toFilePath();
+    while (normalizedPath.length > 1 &&
+        normalizedPath.endsWith(Platform.pathSeparator)) {
+      normalizedPath = normalizedPath.substring(
+        0,
+        normalizedPath.length - Platform.pathSeparator.length,
+      );
+    }
+    return normalizedPath;
+  }
+
+  DownloadEntry _buildStaleFailureEntry(
+    DownloadEntry entry,
+    String reason,
+    DownloadFailureKind failureKind,
+  ) {
     return DownloadEntry(
       id: entry.id,
       seriesId: entry.seriesId,
@@ -587,6 +774,7 @@ class LocalDownloadsRepository implements DownloadsRepository {
       createdAt: entry.createdAt,
       completedAt: null,
       lastError: reason,
+      failureKind: failureKind,
       sourceKind: entry.sourceKind,
     );
   }
@@ -636,4 +824,14 @@ class _NormalizedDownloadEntry {
 
   final DownloadEntry entry;
   final bool changed;
+}
+
+class _OfflinePackageValidationFailure {
+  const _OfflinePackageValidationFailure({
+    required this.reason,
+    required this.failureKind,
+  });
+
+  final String reason;
+  final DownloadFailureKind failureKind;
 }

@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../domain/models/watchlist_entry.dart';
+import '../../domain/models/watchlist_snapshot.dart';
 import '../di/watchlist_repository_provider.dart';
 
-final watchlistProvider = FutureProvider.autoDispose<List<WatchlistEntry>>((
+final watchlistProvider = FutureProvider.autoDispose<WatchlistSnapshot>((
   ref,
 ) async {
   final repository = ref.watch(watchlistRepositoryProvider);

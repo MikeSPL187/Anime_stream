@@ -6,6 +6,7 @@ import 'package:anime_stream_app/app/watchlist/watchlist_providers.dart';
 import 'package:anime_stream_app/domain/models/availability_state.dart';
 import 'package:anime_stream_app/domain/models/series.dart';
 import 'package:anime_stream_app/domain/models/watchlist_entry.dart';
+import 'package:anime_stream_app/domain/models/watchlist_snapshot.dart';
 import 'package:anime_stream_app/domain/repositories/watchlist_repository.dart';
 
 void main() {
@@ -26,7 +27,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      expect(await container.read(watchlistProvider.future), isEmpty);
+      expect((await container.read(watchlistProvider.future)).entries, isEmpty);
       expect(
         await container.read(
           watchlistMembershipControllerProvider('series-1').future,
@@ -45,7 +46,7 @@ void main() {
       expect(
         (await container.read(
           watchlistProvider.future,
-        )).map((entry) => entry.series.id),
+        )).entries.map((entry) => entry.series.id),
         ['series-1'],
       );
 
@@ -57,7 +58,7 @@ void main() {
         container.read(watchlistMembershipControllerProvider('series-1')).value,
         isFalse,
       );
-      expect(await container.read(watchlistProvider.future), isEmpty);
+      expect((await container.read(watchlistProvider.future)).entries, isEmpty);
     });
   });
 }
@@ -74,18 +75,20 @@ class _FakeWatchlistRepository implements WatchlistRepository {
   }
 
   @override
-  Future<List<WatchlistEntry>> getWatchlist() async {
+  Future<WatchlistSnapshot> getWatchlist() async {
     final entries = _savedAtBySeriesId.entries.toList(growable: false)
       ..sort((left, right) => right.value.compareTo(left.value));
 
-    return entries
-        .map(
-          (entry) => WatchlistEntry(
-            series: seriesById[entry.key]!,
-            addedAt: entry.value,
-          ),
-        )
-        .toList(growable: false);
+    return WatchlistSnapshot(
+      entries: entries
+          .map(
+            (entry) => WatchlistEntry(
+              series: seriesById[entry.key]!,
+              addedAt: entry.value,
+            ),
+          )
+          .toList(growable: false),
+    );
   }
 
   @override

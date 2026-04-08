@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -60,6 +61,7 @@ void main() {
         expect(normalized.localAssetUri, isNull);
         expect(normalized.completedAt, isNull);
         expect(normalized.lastError, 'Offline asset is missing on device.');
+        expect(normalized.failureKind, DownloadFailureKind.offlineAssetMissing);
 
         final persisted = await store.readAll();
         final persistedEntry = DownloadEntry.fromJson(
@@ -70,6 +72,10 @@ void main() {
         expect(persistedEntry.localAssetUri, isNull);
         expect(persistedEntry.completedAt, isNull);
         expect(persistedEntry.lastError, 'Offline asset is missing on device.');
+        expect(
+          persistedEntry.failureKind,
+          DownloadFailureKind.offlineAssetMissing,
+        );
       },
     );
 
@@ -122,6 +128,10 @@ void main() {
           normalized.lastError,
           'Offline package directory is missing on device.',
         );
+        expect(
+          normalized.failureKind,
+          DownloadFailureKind.offlinePackageMissing,
+        );
       },
     );
 
@@ -153,7 +163,11 @@ void main() {
         await packageDir.create(recursive: true);
 
         final assetFile = File('${packageDir.path}/index.m3u8');
-        await assetFile.writeAsString('#EXTM3U\n#EXT-X-ENDLIST\n');
+        final segmentFile = File('${packageDir.path}/asset_0001.ts');
+        await segmentFile.writeAsBytes(const [1, 2, 3, 4]);
+        await assetFile.writeAsString(
+          '#EXTM3U\n#EXTINF:4.0,\nasset_0001.ts\n#EXT-X-ENDLIST\n',
+        );
 
         final entry = DownloadEntry(
           id: 'series-3::ep-7::1080p',
@@ -175,6 +189,7 @@ void main() {
         expect(normalized.status, DownloadStatus.completed);
         expect(normalized.localAssetUri, assetFile.uri.toString());
         expect(normalized.isPlayableOffline, isTrue);
+        expect(normalized.failureKind, isNull);
 
         final playable = await repository.getPlayableDownload(
           seriesId: 'series-3',
@@ -231,14 +246,466 @@ void main() {
         expect(normalized.status, DownloadStatus.failed);
         expect(normalized.localAssetUri, isNull);
         expect(normalized.lastError, 'Offline asset is empty.');
+        expect(
+          normalized.failureKind,
+          DownloadFailureKind.offlineAssetCorrupted,
+        );
+      },
+    );
+
+    test(
+      'demotes completed HLS entry when packaged media asset is missing',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_missing_packaged_asset_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        final packageDir = Directory(
+          '${sandbox.path}/downloads/series-8/ep-4/1080p',
+        );
+        await packageDir.create(recursive: true);
+
+        final manifestFile = File('${packageDir.path}/index.m3u8');
+        await manifestFile.writeAsString(
+          '#EXTM3U\n#EXTINF:4.0,\nasset_0001.ts\n#EXT-X-ENDLIST\n',
+        );
+
+        final entry = DownloadEntry(
+          id: 'series-8::ep-4::1080p',
+          seriesId: 'series-8',
+          episodeId: 'ep-4',
+          selectedQuality: '1080p',
+          status: DownloadStatus.completed,
+          localAssetUri: manifestFile.uri.toString(),
+          storageDirectoryPath: packageDir.path,
+          createdAt: DateTime(2026, 4, 3),
+          completedAt: DateTime(2026, 4, 4),
+        );
+
+        await store.writeAll({entry.id: entry.toJson()});
+
+        final entries = await repository.getDownloads();
+        final normalized = entries.single;
+
+        expect(normalized.status, DownloadStatus.failed);
+        expect(normalized.localAssetUri, isNull);
+        expect(
+          normalized.lastError,
+          'Offline package asset is missing on device.',
+        );
+        expect(
+          normalized.failureKind,
+          DownloadFailureKind.offlinePackageMissing,
+        );
+      },
+    );
+
+    test('demotes legacy queued entry into a restart-required failure', () async {
+      final sandbox = await Directory.systemTemp.createTemp(
+        'anime_stream_downloads_legacy_queue_',
+      );
+      addTearDown(() async {
+        if (await sandbox.exists()) {
+          await sandbox.delete(recursive: true);
+        }
+      });
+
+      final store = JsonDownloadsStore(directoryProvider: () async => sandbox);
+      final repository = LocalDownloadsRepository(
+        downloadsStore: store,
+        remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+        dio: Dio(),
+        downloadsRootDirectoryProvider: () async => sandbox,
+      );
+
+      const entryId = 'series-queue::ep-2::1080p';
+      await store.writeAll({
+        entryId: const DownloadEntry(
+          id: entryId,
+          seriesId: 'series-queue',
+          episodeId: 'ep-2',
+          selectedQuality: '1080p',
+          status: DownloadStatus.queued,
+        ).toJson(),
+      });
+
+      final entries = await repository.getDownloads();
+      final normalized = entries.single;
+
+      expect(normalized.status, DownloadStatus.failed);
+      expect(normalized.failureKind, DownloadFailureKind.transferInterrupted);
+      expect(
+        normalized.lastError,
+        'Download was interrupted before completion. Start it again to save this episode offline.',
+      );
+    });
+
+    test('demotes legacy paused entry into a restart-required failure', () async {
+      final sandbox = await Directory.systemTemp.createTemp(
+        'anime_stream_downloads_legacy_paused_',
+      );
+      addTearDown(() async {
+        if (await sandbox.exists()) {
+          await sandbox.delete(recursive: true);
+        }
+      });
+
+      final store = JsonDownloadsStore(directoryProvider: () async => sandbox);
+      final repository = LocalDownloadsRepository(
+        downloadsStore: store,
+        remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+        dio: Dio(),
+        downloadsRootDirectoryProvider: () async => sandbox,
+      );
+
+      const entryId = 'series-paused::ep-5::720p';
+      await store.writeAll({
+        entryId: const DownloadEntry(
+          id: entryId,
+          seriesId: 'series-paused',
+          episodeId: 'ep-5',
+          selectedQuality: '720p',
+          status: DownloadStatus.paused,
+        ).toJson(),
+      });
+
+      final entries = await repository.getDownloads();
+      final normalized = entries.single;
+
+      expect(normalized.status, DownloadStatus.failed);
+      expect(normalized.failureKind, DownloadFailureKind.transferInterrupted);
+      expect(
+        normalized.lastError,
+        'Download was interrupted before completion. Start it again to save this episode offline.',
+      );
+    });
+
+    test(
+      'demotes stale downloading entry into a restart-required failure',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_stale_downloading_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        const entryId = 'series-stale::ep-7::1080p';
+        await store.writeAll({
+          entryId: const DownloadEntry(
+            id: entryId,
+            seriesId: 'series-stale',
+            episodeId: 'ep-7',
+            selectedQuality: '1080p',
+            status: DownloadStatus.downloading,
+          ).toJson(),
+        });
+
+        final entries = await repository.getDownloads();
+        final normalized = entries.single;
+
+        expect(normalized.status, DownloadStatus.failed);
+        expect(normalized.failureKind, DownloadFailureKind.transferInterrupted);
+        expect(
+          normalized.lastError,
+          'Download was interrupted before completion. Start it again to save this episode offline.',
+        );
+      },
+    );
+
+    test(
+      'keeps a foreground download active while the transfer is still running',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_active_transfer_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        const playlistUrl = 'https://cdn.example.com/series-11/ep-3.m3u8';
+        final remoteDataSource = _CompletingAnilibriaRemoteDataSource();
+        final dio = Dio()
+          ..interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (options, handler) {
+                final uri = options.uri.toString();
+                if (uri == playlistUrl) {
+                  handler.resolve(
+                    Response<String>(
+                      requestOptions: options,
+                      data:
+                          '#EXTM3U\n#EXTINF:4.0,\nsegment_0001.ts\n#EXT-X-ENDLIST\n',
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+                if (uri ==
+                    'https://cdn.example.com/series-11/segment_0001.ts') {
+                  handler.resolve(
+                    Response<List<int>>(
+                      requestOptions: options,
+                      data: const [1, 2, 3, 4],
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    error: 'Unexpected request: $uri',
+                  ),
+                );
+              },
+            ),
+          );
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: remoteDataSource,
+          dio: dio,
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        final downloadFuture = repository.startEpisodeDownload(
+          seriesId: 'series-11',
+          episodeId: 'ep-3',
+          selectedQuality: '1080p',
+        );
+
+        await remoteDataSource.requestStarted.future;
+
+        final activeEntries = await repository.getDownloads();
+        expect(activeEntries.single.status, DownloadStatus.downloading);
+        expect(activeEntries.single.hasActiveTransfer, isTrue);
+
+        remoteDataSource.complete(
+          const AnilibriaReleaseDto(
+            id: 'series-11',
+            episodes: [
+              AnilibriaEpisodeDto(
+                id: 'ep-3',
+                releaseId: 'series-11',
+                ordinal: 3,
+                numberLabel: '3',
+                title: 'Episode 3',
+                hls1080Url: playlistUrl,
+              ),
+            ],
+          ),
+        );
+
+        final completedEntry = await downloadFuture;
+        expect(completedEntry.status, DownloadStatus.completed);
+      },
+    );
+
+    test(
+      'keeps unmanaged directory on disk when removing stored entry',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_remove_guard_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(),
+          dio: Dio(),
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        final unmanagedDirectory = Directory('${sandbox.path}/outside/unsafe');
+        await unmanagedDirectory.create(recursive: true);
+        await File(
+          '${unmanagedDirectory.path}/payload.txt',
+        ).writeAsString('keep me');
+
+        const entryId = 'series-9::ep-1::1080p';
+        await store.writeAll({
+          entryId: DownloadEntry(
+            id: entryId,
+            seriesId: 'series-9',
+            episodeId: 'ep-1',
+            selectedQuality: '1080p',
+            status: DownloadStatus.completed,
+            localAssetUri: Uri.file(
+              '${unmanagedDirectory.path}/payload.txt',
+            ).toString(),
+            storageDirectoryPath: unmanagedDirectory.path,
+            completedAt: DateTime(2026, 4, 5),
+          ).toJson(),
+        });
+
+        await repository.removeDownload(entryId);
+
+        expect(await unmanagedDirectory.exists(), isTrue);
+        expect((await store.readAll()).containsKey(entryId), isFalse);
+      },
+    );
+
+    test(
+      'cleans partial package directory when episode download fails mid-transfer',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'anime_stream_downloads_partial_cleanup_',
+        );
+        addTearDown(() async {
+          if (await sandbox.exists()) {
+            await sandbox.delete(recursive: true);
+          }
+        });
+
+        final playlistUrl = 'https://cdn.example.com/series-10/ep-6.m3u8';
+        final release = AnilibriaReleaseDto(
+          id: 'series-10',
+          episodes: [
+            AnilibriaEpisodeDto(
+              id: 'ep-6',
+              releaseId: 'series-10',
+              ordinal: 6,
+              numberLabel: '6',
+              title: 'Episode 6',
+              hls1080Url: playlistUrl,
+            ),
+          ],
+        );
+        final dio = Dio()
+          ..interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (options, handler) {
+                final uri = options.uri.toString();
+                if (uri == playlistUrl) {
+                  handler.resolve(
+                    Response<String>(
+                      requestOptions: options,
+                      data:
+                          '#EXTM3U\n#EXTINF:4.0,\nsegment_0001.ts\n#EXTINF:4.0,\nsegment_0002.ts\n#EXT-X-ENDLIST\n',
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+                if (uri ==
+                    'https://cdn.example.com/series-10/segment_0001.ts') {
+                  handler.resolve(
+                    Response<List<int>>(
+                      requestOptions: options,
+                      data: const [1, 2, 3, 4],
+                      statusCode: 200,
+                    ),
+                  );
+                  return;
+                }
+                if (uri ==
+                    'https://cdn.example.com/series-10/segment_0002.ts') {
+                  handler.reject(
+                    DioException(
+                      requestOptions: options,
+                      error: 'segment fetch failed',
+                    ),
+                  );
+                  return;
+                }
+
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    error: 'Unexpected request: $uri',
+                  ),
+                );
+              },
+            ),
+          );
+
+        final store = JsonDownloadsStore(
+          directoryProvider: () async => sandbox,
+        );
+        final repository = LocalDownloadsRepository(
+          downloadsStore: store,
+          remoteDataSource: _FakeAnilibriaRemoteDataSource(
+            releaseDetails: release,
+          ),
+          dio: dio,
+          downloadsRootDirectoryProvider: () async => sandbox,
+        );
+
+        await expectLater(
+          repository.startEpisodeDownload(
+            seriesId: 'series-10',
+            episodeId: 'ep-6',
+            selectedQuality: '1080p',
+          ),
+          throwsA(isA<DioException>()),
+        );
+
+        final packageDir = Directory(
+          '${sandbox.path}/downloads/series-10/ep-6/1080p',
+        );
+        expect(await packageDir.exists(), isFalse);
+
+        final persisted = await store.readAll();
+        final persistedEntry = DownloadEntry.fromJson(
+          Map<String, dynamic>.from(
+            persisted['series-10::ep-6::1080p'] as Map<String, dynamic>,
+          ),
+        );
+        expect(persistedEntry.status, DownloadStatus.failed);
+        expect(persistedEntry.failureKind, DownloadFailureKind.transferFailed);
       },
     );
   });
 }
 
 class _FakeAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
+  const _FakeAnilibriaRemoteDataSource({this.releaseDetails});
+
+  final AnilibriaReleaseDto? releaseDetails;
+
   @override
-  Future<List<AnilibriaReleaseDto>> fetchFeaturedReleases({int limit = 20}) {
+  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20}) {
     throw UnimplementedError();
   }
 
@@ -261,8 +728,73 @@ class _FakeAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
   }
 
   @override
-  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) {
+  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) async {
+    if (releaseDetails == null) {
+      throw UnimplementedError();
+    }
+    return releaseDetails!;
+  }
+
+  @override
+  Future<List<AnilibriaEpisodeDto>> fetchReleaseEpisodes(String releaseId) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> searchReleases(
+    String query, {
+    int limit = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchSimulcastReleases({int limit = 20}) {
+    throw UnimplementedError();
+  }
+}
+
+class _CompletingAnilibriaRemoteDataSource
+    implements AnilibriaRemoteDataSource {
+  final Completer<void> requestStarted = Completer<void>();
+  final Completer<AnilibriaReleaseDto> _releaseCompleter =
+      Completer<AnilibriaReleaseDto>();
+
+  void complete(AnilibriaReleaseDto release) {
+    if (!_releaseCompleter.isCompleted) {
+      _releaseCompleter.complete(release);
+    }
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AnilibriaReleaseDto>> fetchPopularReleases({int limit = 20}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AnilibriaReleasePageDto> fetchCatalogPage({
+    int page = 1,
+    int limit = 20,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) async {
+    if (!requestStarted.isCompleted) {
+      requestStarted.complete();
+    }
+    return _releaseCompleter.future;
   }
 
   @override

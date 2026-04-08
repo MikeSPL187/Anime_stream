@@ -1,41 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/player/player_playback_speed.dart';
 import '../../app/router/app_router.dart';
+import '../../app/settings/playback_preferences_providers.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: const [
-          _SectionIntro(
+        children: [
+          const _SectionIntro(
             title: 'Library shortcuts',
             message:
                 'Open saved titles, offline downloads, and completed history from one utility route.',
           ),
-          SizedBox(height: 16),
-          _LibrarySection(),
-          SizedBox(height: 28),
-          _SectionIntro(
-            title: 'Playback behavior',
+          const SizedBox(height: 16),
+          const _LibrarySection(),
+          const SizedBox(height: 28),
+          const _SectionIntro(
+            title: 'Playback preferences',
             message:
-                'These flows are already handled by the app and do not require manual setup.',
+                'Set the default watch behavior the player should reuse every time you open an episode.',
           ),
-          SizedBox(height: 16),
-          _PlaybackSection(),
-          SizedBox(height: 28),
-          _SectionIntro(
+          const SizedBox(height: 16),
+          const _PlaybackPreferencesSection(),
+          const SizedBox(height: 28),
+          const _SectionIntro(
             title: 'Product scope',
             message:
                 'This app stays single-user and relies on AniLibria-backed catalog, series, playback, and offline flows.',
           ),
-          SizedBox(height: 16),
-          _ProductScopeSection(),
+          const SizedBox(height: 16),
+          const _ProductScopeSection(),
         ],
       ),
     );
@@ -107,34 +110,92 @@ class _LibrarySection extends StatelessWidget {
   }
 }
 
-class _PlaybackSection extends StatelessWidget {
-  const _PlaybackSection();
+class _PlaybackPreferencesSection extends ConsumerWidget {
+  const _PlaybackPreferencesSection();
 
   @override
-  Widget build(BuildContext context) {
-    return const _SectionBlock(
-      children: [
-        _InfoRow(
-          icon: Icons.save_rounded,
-          title: 'Automatic progress sync',
-          subtitle:
-              'Playback progress is stored for Continue Watching and Series.',
-        ),
-        Divider(height: 20),
-        _InfoRow(
-          icon: Icons.offline_pin_rounded,
-          title: 'Offline playback supported',
-          subtitle:
-              'Downloaded episodes can open through the player when ready.',
-        ),
-        Divider(height: 20),
-        _InfoRow(
-          icon: Icons.screen_rotation_alt_rounded,
-          title: 'Handset playback adapts by state',
-          subtitle:
-              'Phone playback stays video-first and can expand into fullscreen watching.',
-        ),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preferencesAsync = ref.watch(playbackPreferencesControllerProvider);
+
+    Future<void> savePreference(Future<void> Function() operation) async {
+      try {
+        await operation();
+      } catch (_) {
+        if (!context.mounted) {
+          return;
+        }
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Playback preferences could not be saved right now.',
+              ),
+            ),
+          );
+      }
+    }
+
+    return preferencesAsync.when(
+      loading: () => const _SectionBlock(
+        children: [
+          _InfoRow(
+            icon: Icons.tune_rounded,
+            title: 'Loading playback preferences',
+            subtitle: 'Reading your saved default watch behavior.',
+          ),
+        ],
+      ),
+      error: (error, stackTrace) => _SectionBlock(
+        children: [
+          const _InfoRow(
+            icon: Icons.error_outline_rounded,
+            title: 'Playback preferences unavailable',
+            subtitle:
+                'The player defaults could not be loaded right now. Retry to restore them.',
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: () =>
+                  ref.invalidate(playbackPreferencesControllerProvider),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry'),
+            ),
+          ),
+        ],
+      ),
+      data: (preferences) => _SectionBlock(
+        children: [
+          _TogglePreferenceRow(
+            icon: Icons.skip_next_rounded,
+            title: 'Autoplay next episode',
+            subtitle:
+                'Start the next episode automatically after the countdown finishes.',
+            value: preferences.autoplayNextEpisode,
+            onChanged: (enabled) => savePreference(
+              () => ref
+                  .read(playbackPreferencesControllerProvider.notifier)
+                  .setAutoplayNextEpisode(enabled),
+            ),
+          ),
+          const Divider(height: 28),
+          _ChoicePreferenceRow(
+            icon: Icons.speed_rounded,
+            title: 'Default playback speed',
+            subtitle:
+                'Used when a fresh player session starts. Manual changes during playback still take over for the current watch session.',
+            selectedRate: preferences.defaultPlaybackSpeed,
+            onSelected: (rate) => savePreference(
+              () => ref
+                  .read(playbackPreferencesControllerProvider.notifier)
+                  .setDefaultPlaybackSpeed(rate),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -217,6 +278,110 @@ class _InfoRow extends StatelessWidget {
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TogglePreferenceRow extends StatelessWidget {
+  const _TogglePreferenceRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _IconTile(icon: icon),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Switch.adaptive(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+}
+
+class _ChoicePreferenceRow extends StatelessWidget {
+  const _ChoicePreferenceRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selectedRate,
+    required this.onSelected,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final double selectedRate;
+  final ValueChanged<double> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final normalizedRate = normalizePlayerPlaybackRate(selectedRate);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _IconTile(icon: icon),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final rate in supportedPlayerPlaybackRates)
+                    ChoiceChip(
+                      label: Text(formatPlayerPlaybackRateLabel(rate)),
+                      selected: (normalizedRate - rate).abs() < 0.001,
+                      onSelected: (_) => onSelected(rate),
+                    ),
+                ],
               ),
             ],
           ),

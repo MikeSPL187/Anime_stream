@@ -20,6 +20,29 @@ class PlayerScreenContext {
 
   num? get episodeOrdinal => num.tryParse(episodeNumberLabel.trim());
 
+  bool matchesEpisode({
+    required String id,
+    required String numberLabel,
+    required String title,
+  }) {
+    if (id == episodeId) {
+      return true;
+    }
+
+    final normalizedNumberLabel = numberLabel.trim();
+    if (normalizedNumberLabel == episodeNumberLabel.trim()) {
+      return true;
+    }
+
+    final selectedOrdinal = episodeOrdinal;
+    if (selectedOrdinal != null &&
+        num.tryParse(normalizedNumberLabel) == selectedOrdinal) {
+      return true;
+    }
+
+    return title == episodeTitle;
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {

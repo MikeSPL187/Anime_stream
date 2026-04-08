@@ -395,7 +395,7 @@ class _FakeSeriesRepository implements SeriesRepository {
   final Map<String, List<Episode>> episodesBySeriesId;
 
   @override
-  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
+  Future<List<Series>> getLatestSeries({int limit = 20}) async {
     throw UnimplementedError();
   }
 

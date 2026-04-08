@@ -28,16 +28,38 @@ void main() {
       expect(repository.popularLimit, 8);
       expect(catalog.hasAnyContent, isTrue);
     });
+
+    test('keeps available slices when one browse source fails', () async {
+      final repository = _FakeSeriesRepository(
+        trendingError: StateError('Trending unavailable'),
+      );
+      final container = ProviderContainer(
+        overrides: [seriesRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final catalog = await container.read(browseCatalogProvider.future);
+
+      expect(catalog.latestReleases.map((series) => series.id), ['latest-1']);
+      expect(catalog.trendingSeries, isEmpty);
+      expect(catalog.trendingError, contains('Trending unavailable'));
+      expect(catalog.popularSeries.map((series) => series.id), ['popular-1']);
+      expect(catalog.hasAnyContent, isTrue);
+      expect(catalog.hasAnyUnavailableSlice, isTrue);
+    });
   });
 }
 
 class _FakeSeriesRepository implements SeriesRepository {
+  _FakeSeriesRepository({this.trendingError});
+
   int? latestLimit;
   int? trendingLimit;
   int? popularLimit;
+  final Object? trendingError;
 
   @override
-  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
+  Future<List<Series>> getLatestSeries({int limit = 20}) async {
     latestLimit = limit;
     return const [
       Series(
@@ -83,6 +105,9 @@ class _FakeSeriesRepository implements SeriesRepository {
   @override
   Future<List<Series>> getTrendingSeries({int limit = 20}) async {
     trendingLimit = limit;
+    if (trendingError != null) {
+      throw trendingError!;
+    }
     return const [
       Series(
         id: 'trending-1',

@@ -12,57 +12,72 @@ import 'package:anime_stream_app/features/player/player_screen_context.dart';
 
 void main() {
   group('PlayerPlaybackResolver', () {
-    test('prefers completed offline asset before remote AniLibria HLS resolution', () async {
-      final resolver = PlayerPlaybackResolver(
-        remoteDataSource: _FailingRemoteDataSource(),
-        downloadsRepository: _FakeDownloadsRepository(
-          playableEntry: const DownloadEntry(
-            id: 'series-4::episode-2::1080p',
-            seriesId: 'series-4',
-            episodeId: 'episode-2',
-            selectedQuality: '1080p',
-            status: DownloadStatus.completed,
-            localAssetUri: 'file:///downloads/series-4/episode-2/1080p/index.m3u8',
-            sourceKind: DownloadSourceKind.localHlsManifest,
+    test(
+      'prefers completed offline asset before remote AniLibria HLS resolution',
+      () async {
+        final resolver = PlayerPlaybackResolver(
+          remoteDataSource: _FailingRemoteDataSource(),
+          downloadsRepository: _FakeDownloadsRepository(
+            playableEntry: const DownloadEntry(
+              id: 'series-4::episode-2::1080p',
+              seriesId: 'series-4',
+              episodeId: 'episode-2',
+              selectedQuality: '1080p',
+              status: DownloadStatus.completed,
+              localAssetUri:
+                  'file:///downloads/series-4/episode-2/1080p/index.m3u8',
+              sourceKind: DownloadSourceKind.localHlsManifest,
+            ),
           ),
-        ),
-      );
+        );
 
-      final source = await resolver.resolve(
-        const PlayerScreenContext(
-          seriesId: 'series-4',
-          seriesTitle: 'Pluto',
-          episodeId: 'episode-2',
-          episodeNumberLabel: '2',
-          episodeTitle: 'Assassination Order',
-        ),
-      );
+        final source = await resolver.resolve(
+          const PlayerScreenContext(
+            seriesId: 'series-4',
+            seriesTitle: 'Pluto',
+            episodeId: 'episode-2',
+            episodeNumberLabel: '2',
+            episodeTitle: 'Assassination Order',
+          ),
+        );
 
-      expect(source.sourceUri, 'file:///downloads/series-4/episode-2/1080p/index.m3u8');
-      expect(source.kind, PlayerPlaybackSourceKind.localHlsManifest);
-      expect(source.isOffline, isTrue);
-    });
+        expect(
+          source.sourceUri,
+          'file:///downloads/series-4/episode-2/1080p/index.m3u8',
+        );
+        expect(source.kind, PlayerPlaybackSourceKind.localHlsManifest);
+        expect(source.isOffline, isTrue);
+      },
+    );
 
-    test('falls back to remote HLS resolution when no local asset exists', () async {
-      final resolver = PlayerPlaybackResolver(
-        remoteDataSource: _FakeRemoteDataSource(),
-        downloadsRepository: const _FakeDownloadsRepository(playableEntry: null),
-      );
+    test(
+      'falls back to remote HLS resolution when no local asset exists',
+      () async {
+        final resolver = PlayerPlaybackResolver(
+          remoteDataSource: _FakeRemoteDataSource(),
+          downloadsRepository: const _FakeDownloadsRepository(
+            playableEntry: null,
+          ),
+        );
 
-      final source = await resolver.resolve(
-        const PlayerScreenContext(
-          seriesId: 'series-5',
-          seriesTitle: 'Frieren',
-          episodeId: 'episode-3',
-          episodeNumberLabel: '3',
-          episodeTitle: 'Killing Magic',
-        ),
-      );
+        final source = await resolver.resolve(
+          const PlayerScreenContext(
+            seriesId: 'series-5',
+            seriesTitle: 'Frieren',
+            episodeId: 'episode-3',
+            episodeNumberLabel: '3',
+            episodeTitle: 'Killing Magic',
+          ),
+        );
 
-      expect(source.sourceUri, 'https://cdn.example.com/frieren/episode-3.m3u8');
-      expect(source.kind, PlayerPlaybackSourceKind.remoteHls);
-      expect(source.isOffline, isFalse);
-    });
+        expect(
+          source.sourceUri,
+          'https://cdn.example.com/frieren/episode-3.m3u8',
+        );
+        expect(source.kind, PlayerPlaybackSourceKind.remoteHls);
+        expect(source.isOffline, isFalse);
+      },
+    );
   });
 }
 
@@ -91,16 +106,6 @@ class _FakeDownloadsRepository implements DownloadsRepository {
   }
 
   @override
-  Future<void> pauseDownload(String downloadId) async {}
-
-  @override
-  Future<void> queueEpisodeDownload({
-    required String seriesId,
-    required String episodeId,
-    String selectedQuality = '1080p',
-  }) async {}
-
-  @override
   Future<DownloadEntry> startEpisodeDownload({
     required String seriesId,
     required String episodeId,
@@ -115,7 +120,7 @@ class _FakeDownloadsRepository implements DownloadsRepository {
 
 class _FailingRemoteDataSource implements AnilibriaRemoteDataSource {
   @override
-  Future<List<AnilibriaReleaseDto>> fetchFeaturedReleases({int limit = 20}) {
+  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20}) {
     throw UnimplementedError();
   }
 
@@ -134,7 +139,9 @@ class _FailingRemoteDataSource implements AnilibriaRemoteDataSource {
 
   @override
   Future<AnilibriaReleaseDto> fetchReleaseDetails(String releaseId) {
-    throw StateError('Remote resolution should not be used when offline asset exists.');
+    throw StateError(
+      'Remote resolution should not be used when offline asset exists.',
+    );
   }
 
   @override
@@ -163,7 +170,7 @@ class _FailingRemoteDataSource implements AnilibriaRemoteDataSource {
 
 class _FakeRemoteDataSource implements AnilibriaRemoteDataSource {
   @override
-  Future<List<AnilibriaReleaseDto>> fetchFeaturedReleases({int limit = 20}) {
+  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20}) {
     throw UnimplementedError();
   }
 

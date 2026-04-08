@@ -15,6 +15,14 @@ class DownloadsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final downloads = ref.watch(downloadsListProvider);
+    Future<void> refreshDownloads() async {
+      ref.invalidate(downloadsListProvider);
+      try {
+        await ref.read(downloadsListProvider.future);
+      } catch (_) {
+        return;
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -32,86 +40,94 @@ class DownloadsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: downloads.when(
-        loading: () => const _DownloadsState(
-          icon: Icons.download_rounded,
-          title: 'Loading downloads',
-          message: 'Offline library is being prepared.',
-        ),
-        error: (error, stackTrace) => _DownloadsState(
-          icon: Icons.error_outline_rounded,
-          title: 'Downloads unavailable',
-          message: 'Offline downloads could not be loaded right now.\n$error',
-        ),
-        data: (entries) {
-          if (entries.isEmpty) {
-            return _DownloadsState(
-              icon: Icons.download_outlined,
-              title: 'No downloads yet',
-              message:
-                  'Download episodes from a series page to build an offline library.',
-              action: TextButton.icon(
-                onPressed: () => context.go(AppRoutePaths.myLists),
-                icon: const Icon(Icons.bookmarks_outlined),
-                label: const Text('Back to My Lists'),
-              ),
+      body: RefreshIndicator(
+        onRefresh: refreshDownloads,
+        child: downloads.when(
+          loading: () => const _DownloadsState(
+            icon: Icons.download_rounded,
+            title: 'Loading downloads',
+            message: 'Offline library is being prepared.',
+          ),
+          error: (error, stackTrace) => _DownloadsState(
+            icon: Icons.error_outline_rounded,
+            title: 'Downloads unavailable',
+            message: 'Offline downloads could not be loaded right now.\n$error',
+            action: FilledButton.icon(
+              onPressed: refreshDownloads,
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Retry'),
+            ),
+          ),
+          data: (entries) {
+            if (entries.isEmpty) {
+              return _DownloadsState(
+                icon: Icons.download_outlined,
+                title: 'No downloads yet',
+                message:
+                    'Download episodes from a series page to build an offline library.',
+                action: TextButton.icon(
+                  onPressed: () => context.go(AppRoutePaths.myLists),
+                  icon: const Icon(Icons.bookmarks_outlined),
+                  label: const Text('Back to My Lists'),
+                ),
+              );
+            }
+
+            final offlineReady = entries
+                .where((e) => e.isPlayableOffline)
+                .toList(growable: false);
+            final active = entries
+                .where((e) => e.hasActiveTransfer)
+                .toList(growable: false);
+            final failed = entries
+                .where((e) => e.status == DownloadStatus.failed)
+                .toList(growable: false);
+            final integrityFailures = failed
+                .where((e) => e.requiresOfflineRestore)
+                .length;
+
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+              children: [
+                _SummaryStrip(
+                  totalCount: entries.length,
+                  offlineCount: offlineReady.length,
+                  activeCount: active.length,
+                  failedCount: failed.length,
+                  integrityFailureCount: integrityFailures,
+                ),
+                const SizedBox(height: 22),
+                if (offlineReady.isNotEmpty) ...[
+                  _DownloadsSection(
+                    title: 'Available offline',
+                    subtitle:
+                        'Verified on this device and ready for offline playback.',
+                    entries: offlineReady,
+                  ),
+                  const SizedBox(height: 26),
+                ],
+                if (active.isNotEmpty) ...[
+                  _DownloadsSection(
+                    title: 'Active downloads',
+                    subtitle:
+                        'Transfers currently being packaged for offline playback.',
+                    entries: active,
+                  ),
+                  const SizedBox(height: 26),
+                ],
+                if (failed.isNotEmpty)
+                  _DownloadsSection(
+                    title: 'Needs attention',
+                    subtitle: integrityFailures > 0
+                        ? 'Retry failed transfers or restore missing offline copies.'
+                        : 'Retry or remove failed offline entries.',
+                    entries: failed,
+                  ),
+              ],
             );
-          }
-
-          final offlineReady = entries
-              .where((e) => e.isPlayableOffline)
-              .toList(growable: false);
-          final active = entries
-              .where(
-                (e) =>
-                    e.status == DownloadStatus.downloading ||
-                    e.status == DownloadStatus.queued ||
-                    e.status == DownloadStatus.paused,
-              )
-              .toList(growable: false);
-          final failed = entries
-              .where((e) => e.status == DownloadStatus.failed)
-              .toList(growable: false);
-          final integrityFailures = failed.where(_isIntegrityFailure).length;
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-            children: [
-              _SummaryStrip(
-                totalCount: entries.length,
-                offlineCount: offlineReady.length,
-                activeCount: active.length,
-                failedCount: failed.length,
-                integrityFailureCount: integrityFailures,
-              ),
-              const SizedBox(height: 22),
-              if (offlineReady.isNotEmpty) ...[
-                _DownloadsSection(
-                  title: 'Available offline',
-                  subtitle: 'Ready to open directly in the player.',
-                  entries: offlineReady,
-                ),
-                const SizedBox(height: 26),
-              ],
-              if (active.isNotEmpty) ...[
-                _DownloadsSection(
-                  title: 'Active downloads',
-                  subtitle: 'Queued, downloading, and paused transfers.',
-                  entries: active,
-                ),
-                const SizedBox(height: 26),
-              ],
-              if (failed.isNotEmpty)
-                _DownloadsSection(
-                  title: 'Needs attention',
-                  subtitle: integrityFailures > 0
-                      ? 'Retry failed transfers or restore missing offline copies.'
-                      : 'Retry or remove failed offline entries.',
-                  entries: failed,
-                ),
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -200,7 +216,7 @@ class _DownloadCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailsAsync = ref.watch(seriesDetailsProvider(entry.seriesId));
+    final contentAsync = ref.watch(seriesContentProvider(entry.seriesId));
     final actionState = ref.watch(
       episodeDownloadActionControllerProvider(
         EpisodeDownloadKey(
@@ -210,7 +226,7 @@ class _DownloadCard extends ConsumerWidget {
       ),
     );
 
-    return detailsAsync.when(
+    return contentAsync.when(
       loading: () => _DownloadCardScaffold(
         entry: entry,
         isBusy: actionState.isLoading,
@@ -255,8 +271,8 @@ class _DownloadCard extends ConsumerWidget {
               )
             : null,
       ),
-      data: (details) {
-        final episode = _episodeForEntry(details.episodes, entry.episodeId);
+      data: (content) {
+        final episode = content.episodeById(entry.episodeId);
         final episodeLabel = episode == null
             ? 'Episode ${entry.episodeId}'
             : 'Episode ${episode.numberLabel}';
@@ -264,8 +280,8 @@ class _DownloadCard extends ConsumerWidget {
             ? episodeLabel
             : episode.title;
         final playerContext = PlayerScreenContext(
-          seriesId: details.series.id,
-          seriesTitle: details.series.title,
+          seriesId: content.series.id,
+          seriesTitle: content.series.title,
           episodeId: entry.episodeId,
           episodeNumberLabel: episode?.numberLabel ?? entry.episodeId,
           episodeTitle: episodeTitle,
@@ -274,8 +290,8 @@ class _DownloadCard extends ConsumerWidget {
         return _DownloadCardScaffold(
           entry: entry,
           isBusy: actionState.isLoading,
-          seriesTitle: details.series.title,
-          posterUrl: details.series.posterImageUrl,
+          seriesTitle: content.series.title,
+          posterUrl: content.series.posterImageUrl,
           episodeLabel: episodeLabel,
           episodeTitle: episodeTitle,
           onOpenSeries: () =>
@@ -287,25 +303,6 @@ class _DownloadCard extends ConsumerWidget {
       },
     );
   }
-
-  EpisodeSummary? _episodeForEntry(List<dynamic> episodes, String episodeId) {
-    for (final episode in episodes) {
-      if (episode.id == episodeId) {
-        return EpisodeSummary(
-          numberLabel: episode.numberLabel,
-          title: episode.title,
-        );
-      }
-    }
-    return null;
-  }
-}
-
-class EpisodeSummary {
-  const EpisodeSummary({required this.numberLabel, required this.title});
-
-  final String numberLabel;
-  final String title;
 }
 
 class _DownloadCardScaffold extends ConsumerWidget {
@@ -349,25 +346,27 @@ class _DownloadCardScaffold extends ConsumerWidget {
       await controller.startDownload(selectedQuality: entry.selectedQuality);
     }
 
-    final integrityFailure = _isIntegrityFailure(entry);
+    final integrityFailure = entry.requiresOfflineRestore;
+    final restartRequired = _downloadNeedsRestart(entry);
     final pillLabel = switch (entry.status) {
       DownloadStatus.completed when entry.isPlayableOffline => 'Offline ready',
       DownloadStatus.completed => 'Downloaded',
       DownloadStatus.downloading => 'Downloading',
-      DownloadStatus.queued => 'Queued',
-      DownloadStatus.paused => 'Paused',
+      DownloadStatus.queued || DownloadStatus.paused => 'Restart needed',
       DownloadStatus.failed when integrityFailure => 'Restore needed',
-      DownloadStatus.failed => 'Failed',
+      DownloadStatus.failed when restartRequired => 'Restart needed',
+      DownloadStatus.failed => 'Retry needed',
     };
     final pillIcon = switch (entry.status) {
       DownloadStatus.completed when entry.isPlayableOffline =>
         Icons.offline_pin_rounded,
       DownloadStatus.completed => Icons.check_circle_outline_rounded,
       DownloadStatus.downloading => Icons.download_rounded,
-      DownloadStatus.queued => Icons.schedule_rounded,
-      DownloadStatus.paused => Icons.pause_circle_outline_rounded,
+      DownloadStatus.queued ||
+      DownloadStatus.paused => Icons.restart_alt_rounded,
       DownloadStatus.failed when integrityFailure =>
         Icons.warning_amber_rounded,
+      DownloadStatus.failed when restartRequired => Icons.restart_alt_rounded,
       DownloadStatus.failed => Icons.error_outline_rounded,
     };
 
@@ -500,6 +499,7 @@ class _DownloadCardScaffold extends ConsumerWidget {
                               label: const Text('Play offline'),
                             )
                           else if (entry.status == DownloadStatus.failed ||
+                              entry.status == DownloadStatus.queued ||
                               entry.status == DownloadStatus.paused)
                             FilledButton.tonalIcon(
                               onPressed: isBusy ? null : () => handleRetry(),
@@ -551,34 +551,40 @@ class _DownloadsState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40, color: theme.colorScheme.primary),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: theme.textTheme.headlineSmall,
-                textAlign: TextAlign.center,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 420),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 40, color: theme.colorScheme.primary),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: theme.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (action != null) ...[const SizedBox(height: 16), action!],
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (action != null) ...[const SizedBox(height: 16), action!],
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -640,29 +646,29 @@ class _OverlayPill extends StatelessWidget {
   }
 }
 
-bool _isIntegrityFailure(DownloadEntry entry) {
-  if (entry.status != DownloadStatus.failed) {
-    return false;
-  }
-
-  final error = (entry.lastError ?? '').trim().toLowerCase();
-  return error.startsWith('offline asset') ||
-      error.startsWith('offline package directory');
-}
-
 String _friendlyDownloadError(DownloadEntry entry) {
-  if (!_isIntegrityFailure(entry)) {
-    return entry.lastError ?? '';
+  final lastError = entry.lastError ?? '';
+  if (entry.failureKind == DownloadFailureKind.transferInterrupted) {
+    return 'Download was interrupted before completion. Start it again to save this episode offline.';
+  }
+  if (entry.failureKind == DownloadFailureKind.transferFailed) {
+    return 'Download did not complete. Retry it to save this episode offline.';
   }
 
-  final error = (entry.lastError ?? '').trim().toLowerCase();
-  if (error.contains('missing on device')) {
-    return 'Offline copy is missing on this device. Download it again to restore playback.';
+  if (!entry.requiresOfflineRestore) {
+    return lastError;
   }
-  if (error.contains('empty') || error.contains('invalid')) {
-    return 'Offline package is damaged and needs to be downloaded again.';
-  }
-  return 'Offline copy needs to be restored before it can play again.';
+
+  return switch (entry.failureKind) {
+    DownloadFailureKind.offlineAssetMissing ||
+    DownloadFailureKind.offlinePackageMissing =>
+      'Offline copy is missing on this device. Download it again to restore playback.',
+    DownloadFailureKind.offlineAssetInvalid ||
+    DownloadFailureKind.offlineAssetCorrupted ||
+    DownloadFailureKind.offlinePackageCorrupted =>
+      'Offline package is damaged and needs to be downloaded again.',
+    _ => lastError,
+  };
 }
 
 String _downloadStatusLabel(DownloadEntry entry) {
@@ -671,10 +677,16 @@ String _downloadStatusLabel(DownloadEntry entry) {
       'Available offline',
     DownloadStatus.completed => 'Downloaded',
     DownloadStatus.downloading => 'Downloading',
-    DownloadStatus.queued => 'Queued',
-    DownloadStatus.paused => 'Paused',
-    DownloadStatus.failed when _isIntegrityFailure(entry) =>
+    DownloadStatus.queued || DownloadStatus.paused => 'Restart needed',
+    DownloadStatus.failed when entry.requiresOfflineRestore =>
       'Unavailable offline',
-    DownloadStatus.failed => 'Failed',
+    DownloadStatus.failed when _downloadNeedsRestart(entry) => 'Restart needed',
+    DownloadStatus.failed => 'Retry needed',
   };
+}
+
+bool _downloadNeedsRestart(DownloadEntry entry) {
+  return entry.failureKind == DownloadFailureKind.transferInterrupted ||
+      entry.status == DownloadStatus.queued ||
+      entry.status == DownloadStatus.paused;
 }

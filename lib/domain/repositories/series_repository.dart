@@ -3,7 +3,7 @@ import '../models/series_catalog_page.dart';
 import '../models/series.dart';
 
 abstract interface class SeriesRepository {
-  Future<List<Series>> getFeaturedSeries({int limit = 20});
+  Future<List<Series>> getLatestSeries({int limit = 20});
 
   Future<List<Series>> getTrendingSeries({int limit = 20});
 

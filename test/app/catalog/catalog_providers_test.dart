@@ -61,7 +61,7 @@ class _FakeSeriesRepository implements SeriesRepository {
   }
 
   @override
-  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
+  Future<List<Series>> getLatestSeries({int limit = 20}) async {
     throw UnimplementedError();
   }
 

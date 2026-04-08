@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/router/app_router.dart';
 import '../../app/watchlist/watchlist_providers.dart';
 import '../../domain/models/watchlist_entry.dart';
+import '../../domain/models/watchlist_snapshot.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
 
 class WatchlistScreen extends ConsumerWidget {
@@ -13,6 +14,15 @@ class WatchlistScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final watchlist = ref.watch(watchlistProvider);
+
+    Future<void> refreshWatchlist() async {
+      ref.invalidate(watchlistProvider);
+      try {
+        await ref.read(watchlistProvider.future);
+      } catch (_) {
+        return;
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Watchlist')),
@@ -27,20 +37,23 @@ class WatchlistScreen extends ConsumerWidget {
           title: 'Watchlist unavailable',
           message: 'Saved titles could not be loaded.\n$error',
         ),
-        data: (entries) => _WatchlistBody(entries: entries),
+        data: (snapshot) => RefreshIndicator(
+          onRefresh: refreshWatchlist,
+          child: _WatchlistBody(snapshot: snapshot),
+        ),
       ),
     );
   }
 }
 
 class _WatchlistBody extends StatelessWidget {
-  const _WatchlistBody({required this.entries});
+  const _WatchlistBody({required this.snapshot});
 
-  final List<WatchlistEntry> entries;
+  final WatchlistSnapshot snapshot;
 
   @override
   Widget build(BuildContext context) {
-    if (entries.isEmpty) {
+    if (snapshot.isEmpty) {
       return const _CenteredState(
         icon: Icons.bookmark_add_outlined,
         title: 'No saved titles yet',
@@ -48,30 +61,46 @@ class _WatchlistBody extends StatelessWidget {
       );
     }
 
+    final entries = snapshot.entries;
+
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        _SummaryStrip(count: entries.length),
+        _SummaryStrip(snapshot: snapshot),
         const SizedBox(height: 20),
-        _SurfaceBlock(
-          child: Column(
-            children: [
-              for (var index = 0; index < entries.length; index++) ...[
-                if (index > 0) const Divider(height: 20),
-                _WatchlistRow(entry: entries[index]),
+        if (snapshot.hasTemporarilyUnavailableEntries &&
+            entries.isNotEmpty) ...[
+          _UnavailableSavedTitlesNotice(snapshot: snapshot),
+          const SizedBox(height: 16),
+        ],
+        if (entries.isEmpty)
+          _SurfaceBlock(
+            child: _UnavailableSavedTitlesNotice(
+              snapshot: snapshot,
+              compact: true,
+            ),
+          )
+        else
+          _SurfaceBlock(
+            child: Column(
+              children: [
+                for (var index = 0; index < entries.length; index++) ...[
+                  if (index > 0) const Divider(height: 20),
+                  _WatchlistRow(entry: entries[index]),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
       ],
     );
   }
 }
 
 class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.count});
+  const _SummaryStrip({required this.snapshot});
 
-  final int count;
+  final WatchlistSnapshot snapshot;
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +110,67 @@ class _SummaryStrip extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        _CountBadge(label: '$count saved', color: colorScheme.primary),
+        _CountBadge(
+          label: '${snapshot.totalSavedCount} saved',
+          color: colorScheme.primary,
+        ),
+        if (snapshot.hasTemporarilyUnavailableEntries)
+          _CountBadge(
+            label: '${snapshot.temporarilyUnavailableCount} unavailable',
+            color: colorScheme.secondary,
+          ),
       ],
+    );
+  }
+}
+
+class _UnavailableSavedTitlesNotice extends StatelessWidget {
+  const _UnavailableSavedTitlesNotice({
+    required this.snapshot,
+    this.compact = false,
+  });
+
+  final WatchlistSnapshot snapshot;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final unavailableLabel = snapshot.temporarilyUnavailableCount == 1
+        ? '1 saved title is temporarily unavailable.'
+        : '${snapshot.temporarilyUnavailableCount} saved titles are temporarily unavailable.';
+
+    final message = snapshot.entries.isEmpty
+        ? '$unavailableLabel Pull to refresh and try restoring them later.'
+        : '$unavailableLabel Visible titles stay available below, and the missing ones remain saved until the source comes back or the series is confirmed gone.';
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Some saved titles are unavailable',
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          message,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+
+    if (compact) {
+      return content;
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: content),
     );
   }
 }

@@ -48,6 +48,62 @@ void main() {
         expect(repository.lastSearchQuery, isNull);
       },
     );
+
+    test(
+      'ranks an exact title match ahead of looser provider ordering',
+      () async {
+        final repository = _FakeSeriesRepository(
+          searchResults: const [
+            Series(
+              id: 'boruto',
+              slug: 'boruto',
+              title: 'Boruto: Naruto Next Generations',
+            ),
+            Series(id: 'naruto', slug: 'naruto', title: 'Naruto'),
+          ],
+        );
+        final container = ProviderContainer(
+          overrides: [seriesRepositoryProvider.overrideWithValue(repository)],
+        );
+        addTearDown(container.dispose);
+
+        final results = await container.read(
+          searchSeriesProvider('naruto').future,
+        );
+
+        expect(results, hasLength(2));
+        expect(results.first.id, 'naruto');
+      },
+    );
+
+    test('uses original title matches to improve result ordering', () async {
+      final repository = _FakeSeriesRepository(
+        searchResults: const [
+          Series(
+            id: 'spy-family-catalog',
+            slug: 'spy-family-catalog',
+            title: 'Catalog Special',
+            originalTitle: 'Spy x Family',
+          ),
+          Series(
+            id: 'family-comedy',
+            slug: 'family-comedy',
+            title: 'Family Comedy Hour',
+          ),
+        ],
+      );
+      final container = ProviderContainer(
+        overrides: [seriesRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final results = await container.read(
+        searchSeriesProvider('spy x family').future,
+      );
+
+      expect(results, hasLength(2));
+      expect(results.first.id, 'spy-family-catalog');
+    });
   });
 }
 
@@ -59,7 +115,7 @@ class _FakeSeriesRepository implements SeriesRepository {
   int? lastSearchLimit;
 
   @override
-  Future<List<Series>> getFeaturedSeries({int limit = 20}) async {
+  Future<List<Series>> getLatestSeries({int limit = 20}) async {
     throw UnimplementedError();
   }
 

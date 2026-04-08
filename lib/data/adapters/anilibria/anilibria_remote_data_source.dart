@@ -3,7 +3,7 @@ import '../../dto/anilibria/anilibria_release_page_dto.dart';
 import '../../dto/anilibria/anilibria_release_dto.dart';
 
 abstract interface class AnilibriaRemoteDataSource {
-  Future<List<AnilibriaReleaseDto>> fetchFeaturedReleases({int limit = 20});
+  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({int limit = 20});
 
   Future<List<AnilibriaReleaseDto>> fetchTrendingReleases({int limit = 20});
 

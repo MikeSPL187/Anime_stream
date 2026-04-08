@@ -14,7 +14,7 @@ class DioAnilibriaRemoteDataSource implements AnilibriaRemoteDataSource {
   final Dio _dio;
 
   @override
-  Future<List<AnilibriaReleaseDto>> fetchFeaturedReleases({
+  Future<List<AnilibriaReleaseDto>> fetchLatestReleases({
     int limit = 20,
   }) async {
     final payload = await _getJson(

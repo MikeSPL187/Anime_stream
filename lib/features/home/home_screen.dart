@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../app/browse/browse_providers.dart';
 import '../../app/home/home_continue_watching.dart';
+import '../../app/home/home_discovery.dart';
 import '../../app/router/app_router.dart';
-import '../../app/series/series_providers.dart';
 import '../../domain/models/series.dart';
 import '../../shared/widgets/anime_cached_artwork.dart';
 import '../../shared/widgets/media_overlay_pill.dart';
@@ -15,9 +14,14 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final featuredSeries = ref.watch(featuredSeriesProvider);
     final continueWatching = ref.watch(homeContinueWatchingProvider);
-    final browseCatalog = ref.watch(browseCatalogProvider);
+    final homeDiscovery = ref.watch(homeDiscoveryProvider);
+    Future<void> handleRefresh() async {
+      await Future.wait<Object?>([
+        ref.refresh(homeContinueWatchingProvider.future),
+        ref.refresh(homeDiscoveryProvider.future),
+      ]);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -36,9 +40,9 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: _HomeLaunchSurface(
-        featuredSeries: featuredSeries,
         continueWatching: continueWatching,
-        browseCatalog: browseCatalog,
+        homeDiscovery: homeDiscovery,
+        onRefresh: handleRefresh,
       ),
     );
   }
@@ -46,25 +50,27 @@ class HomeScreen extends ConsumerWidget {
 
 class _HomeLaunchSurface extends StatelessWidget {
   const _HomeLaunchSurface({
-    required this.featuredSeries,
     required this.continueWatching,
-    required this.browseCatalog,
+    required this.homeDiscovery,
+    required this.onRefresh,
   });
 
-  final AsyncValue<List<Series>> featuredSeries;
   final AsyncValue<List<HomeContinueWatchingItem>> continueWatching;
-  final AsyncValue<BrowseCatalogData> browseCatalog;
+  final AsyncValue<HomeDiscoveryData> homeDiscovery;
+  final RefreshCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final featuredData = featuredSeries.asData?.value ?? const <Series>[];
-    final browseData = browseCatalog.asData?.value;
-    final hasInitialContent = featuredData.isNotEmpty || browseData != null;
-    final isInitialLoading =
-        !hasInitialContent &&
-        (featuredSeries.isLoading || browseCatalog.isLoading);
+    final continueWatchingData =
+        continueWatching.asData?.value ?? const <HomeContinueWatchingItem>[];
+    final discoveryData = homeDiscovery.asData?.value;
+    final latestReleases = discoveryData?.latestReleases ?? const <Series>[];
+    final hasInitialContent =
+        continueWatchingData.isNotEmpty ||
+        (discoveryData?.hasAnyContent ?? false);
+    final isInitialLoading = !hasInitialContent && homeDiscovery.isLoading;
     final hideContinueWatching =
-        continueWatching.asData?.value.isEmpty == true &&
+        continueWatchingData.isEmpty &&
         !continueWatching.isLoading &&
         !continueWatching.hasError;
 
@@ -73,7 +79,7 @@ class _HomeLaunchSurface extends StatelessWidget {
     }
 
     return RefreshIndicator(
-      onRefresh: () async {},
+      onRefresh: onRefresh,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
@@ -81,18 +87,30 @@ class _HomeLaunchSurface extends StatelessWidget {
             _ContinueWatchingSection(continueWatching: continueWatching),
             const SizedBox(height: 24),
           ],
-          if (featuredData.isNotEmpty)
-            _FeaturedHero(series: featuredData.first)
+          if (homeDiscovery.isLoading && discoveryData == null)
+            const _SectionLoadingState(title: 'Latest Spotlight')
+          else if (homeDiscovery.hasError && discoveryData == null)
+            const _SectionErrorState(
+              title: 'Latest Spotlight',
+              message: 'Home discovery could not be loaded right now.',
+            )
+          else if (latestReleases.isNotEmpty)
+            _LatestSpotlightHero(series: latestReleases.first)
+          else if ((discoveryData?.latestError ?? '').trim().isNotEmpty)
+            const _SectionErrorState(
+              title: 'Latest Spotlight',
+              message: 'Latest releases could not be loaded right now.',
+            )
           else
             const _InlineEmptyState(
-              title: 'Featured anime unavailable',
+              title: 'Latest release unavailable',
               message:
-                  'Home will spotlight a launch title when discovery resolves one.',
+                  'Home will surface a latest release spotlight when discovery resolves one.',
             ),
           const SizedBox(height: 28),
           _DiscoverySection(
-            featuredSeries: featuredData.skip(1).toList(growable: false),
-            browseCatalog: browseCatalog,
+            latestReleases: latestReleases.skip(1).toList(growable: false),
+            homeDiscovery: homeDiscovery,
           ),
         ],
       ),
@@ -255,8 +273,8 @@ class _ContinueWatchingCard extends StatelessWidget {
   }
 }
 
-class _FeaturedHero extends StatelessWidget {
-  const _FeaturedHero({required this.series});
+class _LatestSpotlightHero extends StatelessWidget {
+  const _LatestSpotlightHero({required this.series});
 
   final Series series;
 
@@ -271,7 +289,7 @@ class _FeaturedHero extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(title: 'Featured'),
+        const _SectionHeader(title: 'Latest Spotlight'),
         const SizedBox(height: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(22),
@@ -305,7 +323,7 @@ class _FeaturedHero extends StatelessWidget {
                   left: 16,
                   top: 16,
                   child: MediaOverlayPill(
-                    label: 'Featured release',
+                    label: 'Latest release',
                     icon: Icons.star_rounded,
                   ),
                 ),
@@ -376,7 +394,7 @@ class _FeaturedHero extends StatelessWidget {
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
                             ),
-                            child: const Text('Browse More'),
+                            child: const Text('Browse latest'),
                           ),
                         ],
                       ),
@@ -394,57 +412,52 @@ class _FeaturedHero extends StatelessWidget {
 
 class _DiscoverySection extends StatelessWidget {
   const _DiscoverySection({
-    required this.featuredSeries,
-    required this.browseCatalog,
+    required this.latestReleases,
+    required this.homeDiscovery,
   });
 
-  final List<Series> featuredSeries;
-  final AsyncValue<BrowseCatalogData> browseCatalog;
+  final List<Series> latestReleases;
+  final AsyncValue<HomeDiscoveryData> homeDiscovery;
 
   @override
   Widget build(BuildContext context) {
-    final browseData = browseCatalog.asData?.value;
+    final discoveryData = homeDiscovery.asData?.value;
 
-    if (browseCatalog.isLoading && browseData == null) {
+    if (homeDiscovery.isLoading && discoveryData == null) {
       return const _SectionLoadingState(title: 'Discover');
     }
 
-    if (browseCatalog.hasError && browseData == null) {
+    if (homeDiscovery.hasError && discoveryData == null) {
       return const _SectionErrorState(
         title: 'Discover',
-        message: 'Browse slices could not be loaded right now.',
+        message: 'Home discovery slices could not be loaded right now.',
       );
     }
 
     final sections = <Widget>[];
-    if (browseData != null && browseData.latestReleases.isNotEmpty) {
+    if (discoveryData != null && discoveryData.trendingSeries.isNotEmpty) {
       sections.add(
         _PosterRailSection(
-          title: 'Latest Releases',
-          seriesList: browseData.latestReleases,
-          trailingLabel: 'Browse',
+          title: 'Trending now',
+          seriesList: discoveryData.trendingSeries,
         ),
       );
     }
-    if (browseData != null && browseData.trendingSeries.isNotEmpty) {
-      sections.add(
-        _PosterRailSection(
-          title: 'Trending Ongoing',
-          seriesList: browseData.trendingSeries,
-        ),
-      );
-    }
-    if (browseData != null && browseData.popularSeries.isNotEmpty) {
+    if (discoveryData != null && discoveryData.popularSeries.isNotEmpty) {
       sections.add(
         _PosterRailSection(
           title: 'Popular Catalog',
-          seriesList: browseData.popularSeries,
+          seriesList: discoveryData.popularSeries,
         ),
       );
     }
-    if (featuredSeries.isNotEmpty) {
+    if (latestReleases.isNotEmpty) {
       sections.add(
-        _PosterRailSection(title: 'More to Start', seriesList: featuredSeries),
+        _PosterRailSection(
+          title: 'More recent releases',
+          seriesList: latestReleases,
+          trailingLabel: 'Browse',
+        ),
       );
     }
 

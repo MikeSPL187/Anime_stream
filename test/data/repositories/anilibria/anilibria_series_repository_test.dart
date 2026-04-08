@@ -13,7 +13,7 @@ import 'package:anime_stream_app/domain/models/series.dart';
 
 void main() {
   group('AniLibriaSeriesRepository', () {
-    test('maps featured series from latest releases payloads', () async {
+    test('maps latest series from latest releases payloads', () async {
       final repository = _buildRepository((options) async {
         expect(options.path, 'anime/releases/latest');
         expect(options.queryParameters['limit'], 1);
@@ -33,7 +33,7 @@ void main() {
         ];
       });
 
-      final seriesList = await repository.getFeaturedSeries(limit: 1);
+      final seriesList = await repository.getLatestSeries(limit: 1);
 
       expect(seriesList, hasLength(1));
 
@@ -118,6 +118,41 @@ void main() {
       expect(series.posterImageUrl, isNotNull);
     });
 
+    test(
+      'maps a missing release lookup into a confirmed missing-series error',
+      () async {
+        final dio =
+            Dio(BaseOptions(baseUrl: DioAnilibriaRemoteDataSource.apiBaseUrl))
+              ..interceptors.add(
+                InterceptorsWrapper(
+                  onRequest: (options, handler) async {
+                    handler.reject(
+                      DioException(
+                        requestOptions: options,
+                        response: Response<dynamic>(
+                          requestOptions: options,
+                          statusCode: 404,
+                        ),
+                        type: DioExceptionType.badResponse,
+                      ),
+                    );
+                  },
+                ),
+              );
+
+        final repository = AniLibriaSeriesRepository(
+          remoteDataSource: DioAnilibriaRemoteDataSource(dio: dio),
+          seriesMapper: const AnilibriaSeriesMapper(),
+          episodeMapper: const AnilibriaEpisodeMapper(),
+        );
+
+        await expectLater(
+          () => repository.getSeriesById('404'),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
     test('maps episodes from release details payloads', () async {
       final repository = _buildRepository((options) async {
         expect(options.path, 'anime/releases/101');
@@ -172,6 +207,43 @@ void main() {
       );
       expect(episodes.last.availability.status, AvailabilityStatus.available);
     });
+
+    test(
+      'reuses one release request for concurrent series and episode reads',
+      () async {
+        var requestCount = 0;
+        final repository = _buildRepository((options) async {
+          requestCount += 1;
+          expect(options.path, 'anime/releases/777');
+          expect(options.queryParameters, isEmpty);
+
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          return _releasePayload(
+            id: 777,
+            alias: 'kaiju-no-8',
+            mainName: 'Кайдзю № 8',
+            englishName: 'Kaiju No. 8',
+            episodes: [
+              _episodePayload(
+                id: 'episode-1',
+                ordinal: 1,
+                name: 'The Man Who Became a Monster',
+              ),
+            ],
+          );
+        });
+
+        final results = await Future.wait<Object>([
+          repository.getSeriesById('777'),
+          repository.getEpisodes('777'),
+        ]);
+
+        expect(requestCount, 1);
+        expect((results[0] as Series).id, '777');
+        expect((results[1] as List<Episode>), hasLength(1));
+        expect((results[1] as List<Episode>).single.id, 'episode-1');
+      },
+    );
 
     test('maps catalog wrapped payloads for popular series', () async {
       final repository = _buildRepository((options) async {

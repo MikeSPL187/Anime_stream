@@ -1,14 +1,15 @@
-enum DownloadStatus {
-  queued,
-  downloading,
-  paused,
-  completed,
-  failed,
-}
+enum DownloadStatus { queued, downloading, paused, completed, failed }
 
-enum DownloadSourceKind {
-  localHlsManifest,
-  localFile,
+enum DownloadSourceKind { localHlsManifest, localFile }
+
+enum DownloadFailureKind {
+  transferFailed,
+  transferInterrupted,
+  offlineAssetMissing,
+  offlineAssetInvalid,
+  offlineAssetCorrupted,
+  offlinePackageMissing,
+  offlinePackageCorrupted,
 }
 
 class DownloadEntry {
@@ -25,6 +26,7 @@ class DownloadEntry {
     this.createdAt,
     this.completedAt,
     this.lastError,
+    this.failureKind,
     this.sourceKind = DownloadSourceKind.localHlsManifest,
   });
 
@@ -40,6 +42,7 @@ class DownloadEntry {
   final DateTime? createdAt;
   final DateTime? completedAt;
   final String? lastError;
+  final DownloadFailureKind? failureKind;
   final DownloadSourceKind sourceKind;
 
   bool get isPlayableOffline {
@@ -47,6 +50,28 @@ class DownloadEntry {
     return status == DownloadStatus.completed &&
         assetUri != null &&
         assetUri.isNotEmpty;
+  }
+
+  bool get hasActiveTransfer {
+    return switch (status) {
+      DownloadStatus.downloading => true,
+      _ => false,
+    };
+  }
+
+  bool get requiresOfflineRestore {
+    if (status != DownloadStatus.failed) {
+      return false;
+    }
+
+    return switch (failureKind) {
+      DownloadFailureKind.offlineAssetMissing ||
+      DownloadFailureKind.offlineAssetInvalid ||
+      DownloadFailureKind.offlineAssetCorrupted ||
+      DownloadFailureKind.offlinePackageMissing ||
+      DownloadFailureKind.offlinePackageCorrupted => true,
+      _ => false,
+    };
   }
 
   DownloadEntry copyWith({
@@ -62,6 +87,7 @@ class DownloadEntry {
     DateTime? createdAt,
     DateTime? completedAt,
     String? lastError,
+    DownloadFailureKind? failureKind,
     DownloadSourceKind? sourceKind,
   }) {
     return DownloadEntry(
@@ -77,6 +103,7 @@ class DownloadEntry {
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
       lastError: lastError ?? this.lastError,
+      failureKind: failureKind ?? this.failureKind,
       sourceKind: sourceKind ?? this.sourceKind,
     );
   }
@@ -95,24 +122,32 @@ class DownloadEntry {
       'createdAt': createdAt?.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
       'lastError': lastError,
+      'failureKind': failureKind?.name,
       'sourceKind': sourceKind.name,
     };
   }
 
   factory DownloadEntry.fromJson(Map<String, dynamic> json) {
+    final status = _parseDownloadStatus(json['status']);
+    final lastError = json['lastError'] as String?;
     return DownloadEntry(
       id: json['id'] as String? ?? '',
       seriesId: json['seriesId'] as String? ?? '',
       episodeId: json['episodeId'] as String? ?? '',
       selectedQuality: json['selectedQuality'] as String? ?? '1080p',
-      status: _parseDownloadStatus(json['status']),
+      status: status,
       bytesDownloaded: (json['bytesDownloaded'] as num?)?.toInt() ?? 0,
       totalBytes: (json['totalBytes'] as num?)?.toInt(),
       localAssetUri: json['localAssetUri'] as String?,
       storageDirectoryPath: json['storageDirectoryPath'] as String?,
       createdAt: _parseDateTime(json['createdAt']),
       completedAt: _parseDateTime(json['completedAt']),
-      lastError: json['lastError'] as String?,
+      lastError: lastError,
+      failureKind: _parseDownloadFailureKind(
+        json['failureKind'],
+        status: status,
+        lastError: lastError,
+      ),
       sourceKind: _parseDownloadSourceKind(json['sourceKind']),
     );
   }
@@ -133,6 +168,56 @@ class DownloadEntry {
       'localFile' => DownloadSourceKind.localFile,
       _ => DownloadSourceKind.localHlsManifest,
     };
+  }
+
+  static DownloadFailureKind? _parseDownloadFailureKind(
+    Object? value, {
+    required DownloadStatus status,
+    required String? lastError,
+  }) {
+    final explicitKind = switch (value) {
+      'transferFailed' => DownloadFailureKind.transferFailed,
+      'transferInterrupted' => DownloadFailureKind.transferInterrupted,
+      'offlineAssetMissing' => DownloadFailureKind.offlineAssetMissing,
+      'offlineAssetInvalid' => DownloadFailureKind.offlineAssetInvalid,
+      'offlineAssetCorrupted' => DownloadFailureKind.offlineAssetCorrupted,
+      'offlinePackageMissing' => DownloadFailureKind.offlinePackageMissing,
+      'offlinePackageCorrupted' => DownloadFailureKind.offlinePackageCorrupted,
+      _ => null,
+    };
+    if (explicitKind != null) {
+      return explicitKind;
+    }
+
+    if (status != DownloadStatus.failed) {
+      return null;
+    }
+
+    final normalizedError = (lastError ?? '').trim().toLowerCase();
+    if (normalizedError.isEmpty) {
+      return null;
+    }
+
+    if (normalizedError.startsWith('offline asset reference')) {
+      return DownloadFailureKind.offlineAssetInvalid;
+    }
+    if (normalizedError.startsWith('offline asset is missing')) {
+      return DownloadFailureKind.offlineAssetMissing;
+    }
+    if (normalizedError.startsWith('offline asset')) {
+      return DownloadFailureKind.offlineAssetCorrupted;
+    }
+    if (normalizedError.startsWith('offline package directory')) {
+      return DownloadFailureKind.offlinePackageMissing;
+    }
+    if (normalizedError.startsWith('offline package asset is missing')) {
+      return DownloadFailureKind.offlinePackageMissing;
+    }
+    if (normalizedError.startsWith('offline package')) {
+      return DownloadFailureKind.offlinePackageCorrupted;
+    }
+
+    return DownloadFailureKind.transferFailed;
   }
 
   static DateTime? _parseDateTime(Object? value) {
