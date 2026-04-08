@@ -12,115 +12,41 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          const _SummaryStrip(),
-          const SizedBox(height: 20),
-          _SectionBlock(
-            title: 'Library',
-            children: [
-              _ActionRow(
-                icon: Icons.bookmarks_rounded,
-                title: 'Open My Lists',
-                subtitle: 'Saved titles, downloads, and watch history.',
-                onTap: () => context.go(AppRoutePaths.myLists),
-              ),
-              const Divider(height: 20),
-              _ActionRow(
-                icon: Icons.bookmark_outline_rounded,
-                title: 'Open Watchlist',
-                subtitle: 'Saved-for-later titles outside active playback.',
-                onTap: () => context.push(AppRoutePaths.watchlist),
-              ),
-              const Divider(height: 20),
-              _ActionRow(
-                icon: Icons.download_rounded,
-                title: 'Open Downloads',
-                subtitle: 'Offline-ready episodes and active download states.',
-                onTap: () => context.push(AppRoutePaths.downloads),
-              ),
-              const Divider(height: 20),
-              _ActionRow(
-                icon: Icons.history_rounded,
-                title: 'Open History',
-                subtitle: 'Completed episodes kept separate from re-entry.',
-                onTap: () => context.push(AppRoutePaths.history),
-              ),
-            ],
+        children: const [
+          _SectionIntro(
+            title: 'Library shortcuts',
+            message:
+                'Open saved titles, offline downloads, and completed history from one utility route.',
           ),
-          const SizedBox(height: 28),
-          const _SectionBlock(
-            title: 'Playback',
-            children: [
-              _InfoRow(
-                icon: Icons.fullscreen_rounded,
-                title: 'Fullscreen-first handset player',
-                subtitle: 'Phone playback opens as an immersive watch surface.',
-              ),
-              Divider(height: 20),
-              _InfoRow(
-                icon: Icons.save_rounded,
-                title: 'Automatic progress sync',
-                subtitle:
-                    'Playback progress is stored for Continue Watching and Series.',
-              ),
-              Divider(height: 20),
-              _InfoRow(
-                icon: Icons.offline_pin_rounded,
-                title: 'Offline playback supported',
-                subtitle:
-                    'Downloaded episodes can open through the player when ready.',
-              ),
-            ],
+          SizedBox(height: 16),
+          _LibrarySection(),
+          SizedBox(height: 28),
+          _SectionIntro(
+            title: 'Playback behavior',
+            message:
+                'These flows are already handled by the app and do not require manual setup.',
           ),
-          const SizedBox(height: 28),
-          const _SectionBlock(
-            title: 'App scope',
-            children: [
-              _InfoRow(
-                icon: Icons.person_outline_rounded,
-                title: 'Single-user product',
-                subtitle:
-                    'No profiles, subscriptions, or service-scale account systems.',
-              ),
-              Divider(height: 20),
-              _InfoRow(
-                icon: Icons.cloud_outlined,
-                title: 'AniLibria-backed flows',
-                subtitle:
-                    'Catalog, series, playback resolution, and offline packaging use AniLibria-backed data.',
-              ),
-            ],
+          SizedBox(height: 16),
+          _PlaybackSection(),
+          SizedBox(height: 28),
+          _SectionIntro(
+            title: 'Product scope',
+            message:
+                'This app stays single-user and relies on AniLibria-backed catalog, series, playback, and offline flows.',
           ),
+          SizedBox(height: 16),
+          _ProductScopeSection(),
         ],
       ),
     );
   }
 }
 
-class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _CountBadge(label: 'Utility route', color: colorScheme.primary),
-        _CountBadge(label: 'Player ready', color: colorScheme.secondary),
-        _CountBadge(label: 'Offline active', color: colorScheme.tertiary),
-      ],
-    );
-  }
-}
-
-class _SectionBlock extends StatelessWidget {
-  const _SectionBlock({required this.title, required this.children});
+class _SectionIntro extends StatelessWidget {
+  const _SectionIntro({required this.title, required this.message});
 
   final String title;
-  final List<Widget> children;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -130,18 +56,132 @@ class _SectionBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 12),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(children: children),
+        const SizedBox(height: 6),
+        Text(
+          message,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _LibrarySection extends StatelessWidget {
+  const _LibrarySection();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionBlock(
+      children: [
+        _ActionRow(
+          icon: Icons.bookmarks_rounded,
+          title: 'Open My Lists',
+          subtitle: 'Saved titles, downloads, and watch history.',
+          onTap: () => context.go(AppRoutePaths.myLists),
+        ),
+        const Divider(height: 20),
+        _ActionRow(
+          icon: Icons.bookmark_outline_rounded,
+          title: 'Open Watchlist',
+          subtitle: 'Saved-for-later titles outside active playback.',
+          onTap: () => context.push(AppRoutePaths.watchlist),
+        ),
+        const Divider(height: 20),
+        _ActionRow(
+          icon: Icons.download_rounded,
+          title: 'Open Downloads',
+          subtitle: 'Offline-ready episodes and active download states.',
+          onTap: () => context.push(AppRoutePaths.downloads),
+        ),
+        const Divider(height: 20),
+        _ActionRow(
+          icon: Icons.history_rounded,
+          title: 'Open History',
+          subtitle: 'Completed episodes kept separate from re-entry.',
+          onTap: () => context.push(AppRoutePaths.history),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlaybackSection extends StatelessWidget {
+  const _PlaybackSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SectionBlock(
+      children: [
+        _InfoRow(
+          icon: Icons.save_rounded,
+          title: 'Automatic progress sync',
+          subtitle:
+              'Playback progress is stored for Continue Watching and Series.',
+        ),
+        Divider(height: 20),
+        _InfoRow(
+          icon: Icons.offline_pin_rounded,
+          title: 'Offline playback supported',
+          subtitle:
+              'Downloaded episodes can open through the player when ready.',
+        ),
+        Divider(height: 20),
+        _InfoRow(
+          icon: Icons.screen_rotation_alt_rounded,
+          title: 'Handset playback adapts by state',
+          subtitle:
+              'Phone playback stays video-first and can expand into fullscreen watching.',
+        ),
+      ],
+    );
+  }
+}
+
+class _ProductScopeSection extends StatelessWidget {
+  const _ProductScopeSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SectionBlock(
+      children: [
+        _InfoRow(
+          icon: Icons.person_outline_rounded,
+          title: 'Single-user product',
+          subtitle:
+              'No profiles, subscriptions, or service-scale account systems.',
+        ),
+        Divider(height: 20),
+        _InfoRow(
+          icon: Icons.cloud_outlined,
+          title: 'AniLibria-backed flows',
+          subtitle:
+              'Catalog, series, playback resolution, and offline packaging use AniLibria-backed data.',
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionBlock extends StatelessWidget {
+  const _SectionBlock({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(children: children),
+      ),
     );
   }
 }
@@ -259,29 +299,6 @@ class _IconTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, color: theme.colorScheme.primary),
-    );
-  }
-}
-
-class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
-      ),
     );
   }
 }
