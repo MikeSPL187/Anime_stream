@@ -290,7 +290,7 @@ class _PlayerResolutionStage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _RouteBackButton(onPressed: onBackRequested),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Expanded(
                       child: _StageFrame(
                         child: _StageContent(
@@ -300,11 +300,10 @@ class _PlayerResolutionStage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     _CompactSessionSummary(
                       sessionContext: sessionContext,
                       qualityLabel: null,
-                      streamHost: null,
                       statusLabel: 'Opening',
                       statusText: 'Player is preparing this stream.',
                       primaryActionIcon: Icons.arrow_back_rounded,
@@ -964,56 +963,50 @@ class _ResolvedPlaybackSurfaceState
     if (showHandsetCompanion) {
       return DecoratedBox(
         decoration: _playerBackdrop,
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              AspectRatio(aspectRatio: 16 / 9, child: stage),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    12,
-                    8,
-                    12,
-                    MediaQuery.paddingOf(context).bottom + 12,
-                  ),
-                  child: _CompactSessionSummary(
-                    sessionContext: widget.sessionContext,
-                    qualityLabel: _activeQualityLabel,
-                    streamHost: streamHost,
-                    statusLabel: _statusLabel(),
-                    statusText: _statusMessage(),
-                    primaryActionIcon:
-                        widget.canToggleFullscreen && !widget.isFullscreen
-                        ? Icons.fullscreen_rounded
-                        : Icons.menu_book_rounded,
-                    primaryActionLabel:
-                        widget.canToggleFullscreen && !widget.isFullscreen
-                        ? 'Enter Fullscreen'
-                        : 'Open Series',
-                    onPrimaryAction:
-                        widget.canToggleFullscreen && !widget.isFullscreen
-                        ? widget.onToggleFullscreen
-                        : () async {
-                            _openSeriesHub();
-                          },
-                    secondaryActionIcon:
-                        widget.canToggleFullscreen && !widget.isFullscreen
-                        ? Icons.menu_book_rounded
-                        : null,
-                    secondaryActionLabel:
-                        widget.canToggleFullscreen && !widget.isFullscreen
-                        ? 'Open Series'
-                        : null,
-                    onSecondaryAction:
-                        widget.canToggleFullscreen && !widget.isFullscreen
-                        ? _openSeriesHub
-                        : null,
-                  ),
-                ),
+        child: Column(
+          children: [
+            Expanded(child: stage),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                8,
+                12,
+                MediaQuery.paddingOf(context).bottom + 12,
               ),
-            ],
-          ),
+              child: _CompactSessionSummary(
+                sessionContext: widget.sessionContext,
+                qualityLabel: _activeQualityLabel,
+                statusLabel: _statusLabel(),
+                statusText: _statusMessage(),
+                primaryActionIcon:
+                    widget.canToggleFullscreen && !widget.isFullscreen
+                    ? Icons.fullscreen_rounded
+                    : Icons.menu_book_rounded,
+                primaryActionLabel:
+                    widget.canToggleFullscreen && !widget.isFullscreen
+                    ? 'Enter Fullscreen'
+                    : 'Open Series',
+                onPrimaryAction:
+                    widget.canToggleFullscreen && !widget.isFullscreen
+                    ? widget.onToggleFullscreen
+                    : () async {
+                        _openSeriesHub();
+                      },
+                secondaryActionIcon:
+                    widget.canToggleFullscreen && !widget.isFullscreen
+                    ? Icons.menu_book_rounded
+                    : null,
+                secondaryActionLabel:
+                    widget.canToggleFullscreen && !widget.isFullscreen
+                    ? 'Open Series'
+                    : null,
+                onSecondaryAction:
+                    widget.canToggleFullscreen && !widget.isFullscreen
+                    ? _openSeriesHub
+                    : null,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -1441,7 +1434,6 @@ class _CompactSessionSummary extends StatelessWidget {
   const _CompactSessionSummary({
     required this.sessionContext,
     required this.qualityLabel,
-    required this.streamHost,
     required this.statusLabel,
     required this.statusText,
     required this.primaryActionIcon,
@@ -1454,7 +1446,6 @@ class _CompactSessionSummary extends StatelessWidget {
 
   final PlayerScreenContext sessionContext;
   final String? qualityLabel;
-  final String? streamHost;
   final String statusLabel;
   final String statusText;
   final IconData primaryActionIcon;
@@ -1467,78 +1458,50 @@ class _CompactSessionSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final host = switch (streamHost?.trim()) {
-      final value? when value.isNotEmpty => value,
-      _ => null,
-    };
-    final details = <String>[
+    final summaryLine = <String>[
       sessionContext.episodeDisplayLabel,
-      ?qualityLabel,
-      ?host,
+      if (qualityLabel case final value? when value.trim().isNotEmpty)
+        value.trim(),
+      _compactStatusCopy(statusLabel, statusText),
     ].join(' • ');
 
     return _PlayerGlassPanel(
       backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.94),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _HeaderChip(
-                label: sessionContext.episodeDisplayLabel,
-                color: theme.colorScheme.primary,
-              ),
-              if (qualityLabel != null)
-                _HeaderChip(
-                  label: qualityLabel!,
-                  color: theme.colorScheme.secondary,
-                ),
-              _HeaderChip(label: statusLabel, color: theme.colorScheme.primary),
-            ],
-          ),
-          const SizedBox(height: 10),
           Text(
             sessionContext.seriesTitle,
-            style: theme.textTheme.titleMedium?.copyWith(
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             sessionContext.episodeTitle,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          if (details.isNotEmpty) ...[
-            const SizedBox(height: 5),
-            Text(
-              details,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          const SizedBox(height: 6),
           Text(
-            statusText,
-            maxLines: 2,
+            summaryLine,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
-            runSpacing: 8,
+            runSpacing: 6,
             children: [
               FilledButton.icon(
                 onPressed: () {
@@ -1561,6 +1524,29 @@ class _CompactSessionSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+String _compactStatusCopy(String statusLabel, String statusText) {
+  final normalizedStatus = statusText.trim();
+  if (normalizedStatus.startsWith('Episode finished')) {
+    return 'Marked complete';
+  }
+  if (normalizedStatus.startsWith('Playback is active, but the stream')) {
+    return 'Stream catching up';
+  }
+  if (normalizedStatus.startsWith('Playback is active')) {
+    return 'Progress syncing';
+  }
+  if (normalizedStatus.startsWith('Playback is paused')) {
+    return 'Ready to resume';
+  }
+  if (normalizedStatus.startsWith('Player is preparing')) {
+    return 'Preparing stream';
+  }
+  if (normalizedStatus.isNotEmpty) {
+    return normalizedStatus;
+  }
+  return statusLabel.trim();
 }
 
 class _PlaybackTimeline extends StatefulWidget {
